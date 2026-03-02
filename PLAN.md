@@ -66,9 +66,11 @@
 - [x] Updated Player schema (height, weight, jersey_number, college, country, draft info)
 
 ### Twitter/X
-- [ ] Test bearer token auth
-- [ ] Tune search queries for relevant NBA signal quality (injuries, trades, lineup changes)
-- [ ] Verify tweet data structure from `twitter-api-v2` matches our types
+- [x] Test bearer token auth — token authenticates but app is not attached to a developer Project
+- [x] X API v2 search requires Basic tier ($100/mo) minimum; free-tier tokens get `client-not-enrolled`
+- [x] v1.1 search also blocked (code 453)
+- [x] Code already degrades gracefully (returns empty array), improved error logging for this specific case
+- [ ] To enable tweets: attach the app to a Project in the X developer portal and upgrade to Basic tier
 
 ### End-to-End Flow
 - [ ] Onboard with real keys (orchestrator key path)

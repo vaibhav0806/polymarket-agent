@@ -44,7 +44,16 @@ export async function getNBATweets(teams?: string[]): Promise<Tweet[]> {
     return tweets;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[twitter] Search failed: ${message}`);
+    // Common error: token not attached to a project, or free tier without search access
+    if (message.includes("client-not-enrolled") || message.includes("Forbidden")) {
+      console.warn(
+        "[twitter] Bearer token lacks search access. X API v2 search requires " +
+          "the app to be attached to a Project with Basic tier or higher. " +
+          "Skipping tweet fetch."
+      );
+    } else {
+      console.error(`[twitter] Search failed: ${message}`);
+    }
     return [];
   }
 }
