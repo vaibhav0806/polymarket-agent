@@ -2,37 +2,29 @@ import { z } from "zod";
 
 // --- Market schema (matches real `polymarket markets search` -o json output) ---
 
-export const MarketSchema = z.object({
-  id: z.string(),
-  question: z.string(),
-  conditionId: z.string().optional(),
-  slug: z.string().optional(),
-  description: z.string().optional(),
-  outcomes: z.string(), // JSON-encoded string array, e.g. '["Yes","No"]'
-  outcomePrices: z.string().optional(), // JSON-encoded string array, e.g. '["0.55","0.45"]'
-  volume: z.string().optional(),
-  volumeNum: z.string().optional(),
-  active: z.boolean().optional(),
-  closed: z.boolean().optional(),
-  endDate: z.string().nullable().optional(),
-  image: z.string().nullable().optional(),
-  clobTokenIds: z.string().nullable().optional(), // JSON-encoded string array of token IDs
-  enableOrderBook: z.boolean().nullable().optional(),
-  acceptingOrders: z.boolean().nullable().optional(),
-  sportsMarketType: z.string().nullable().optional(),
-  groupItemTitle: z.string().nullable().optional(),
-  negRisk: z.boolean().optional(),
-  bestBid: z.string().optional(),
-  bestAsk: z.string().optional(),
-  lastTradePrice: z.string().optional(),
-  spread: z.string().nullable().optional(),
-  gameStartTime: z.string().nullable().optional(),
-  teamAID: z.union([z.string(), z.number()]).nullable().optional(),
-  teamBID: z.union([z.string(), z.number()]).nullable().optional(),
-  line: z.string().nullable().optional(),
-});
+// Only validate the fields we actually use; passthrough everything else.
+// The Polymarket API frequently adds new fields or returns nulls unpredictably.
+export const MarketSchema = z
+  .object({
+    id: z.string(),
+    question: z.string(),
+    outcomes: z.string(), // JSON-encoded string array, e.g. '["Yes","No"]'
+    closed: z.boolean().optional(),
+    // All optional fields we read — nullable to handle API inconsistencies
+    conditionId: z.string().nullable().optional(),
+    slug: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    outcomePrices: z.string().nullable().optional(),
+    volume: z.string().nullable().optional(),
+    volumeNum: z.string().nullable().optional(),
+    active: z.boolean().nullable().optional(),
+    clobTokenIds: z.string().nullable().optional(),
+    acceptingOrders: z.boolean().nullable().optional(),
+    sportsMarketType: z.string().nullable().optional(),
+  })
+  .passthrough();
 
-export const MarketSearchResultSchema = z.array(MarketSchema.passthrough());
+export const MarketSearchResultSchema = z.array(MarketSchema);
 
 // --- Midpoint (matches `polymarket clob midpoint <tokenId> -o json`) ---
 
@@ -58,10 +50,13 @@ export const OrderBookSchema = z.object({
 export const OrderResultSchema = z
   .object({
     success: z.boolean().optional(),
-    orderID: z.string().optional(),
-    transactionsHashes: z.array(z.string()).optional(),
+    order_id: z.string().optional(),
     status: z.string().optional(),
-    errorMsg: z.string().optional(),
+    making_amount: z.string().optional(),
+    taking_amount: z.string().optional(),
+    transaction_hashes: z.array(z.string()).optional(),
+    trade_ids: z.array(z.string()).optional(),
+    error_msg: z.string().optional(),
   })
   .passthrough();
 

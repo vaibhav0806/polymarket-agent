@@ -6,6 +6,7 @@ import {
 } from "@/lib/polymarket/cli";
 import type { StrategyConfig } from "@/lib/config";
 import type { Recommendation } from "@/lib/agent/analyzer";
+import type { EnrichedMarket } from "@/lib/polymarket/types";
 
 export interface ExecutionResult {
   recommendation: Recommendation;
@@ -17,32 +18,40 @@ export interface ExecutionResult {
 
 function findTokenId(
   recommendation: Recommendation,
-  // We need to resolve the token ID from the market data.
-  // For simplicity, the marketId IS the condition ID, and we derive token from side.
-  // In practice, markets store tokenIds in outcomes. The analyzer should return
-  // the marketId which maps to the market, and we use side to pick YES/NO token.
-  // Since we don't have the outcome mapping here, we treat marketId as the tokenId.
-): string {
-  // The marketId from the analyzer maps to the tokenId for the relevant outcome.
-  // The convention is: marketId is the token ID for the YES outcome.
-  // If the recommendation says NO, we'd need the NO token. However, on Polymarket,
-  // buying NO is equivalent to selling YES in many cases.
-  // We'll use marketId as the token ID directly -- the analyzer is expected
-  // to provide the correct token ID.
-  return recommendation.marketId;
+  markets: EnrichedMarket[]
+): string | null {
+  const market = markets.find((m) => m.id === recommendation.marketId);
+  if (!market) return null;
+
+  // Match side to outcome: YES → first outcome (index 0), NO → second (index 1)
+  const sideIndex = recommendation.side === "YES" ? 0 : 1;
+  const outcome = market.outcomes[sideIndex];
+  if (outcome?.tokenId) return outcome.tokenId;
+
+  // Fallback: try to find by title match
+  const sideLabel = recommendation.side.toLowerCase();
+  const match = market.outcomes.find(
+    (o) => o.title.toLowerCase() === sideLabel || o.title.toLowerCase() === "yes" && recommendation.side === "YES"
+  );
+  return match?.tokenId ?? null;
 }
 
 export async function executeTrades(
   recommendations: Recommendation[],
   strategy: StrategyConfig,
-  cycleId: number
+  cycleId: number,
+  markets: EnrichedMarket[] = []
 ): Promise<ExecutionResult[]> {
   const results: ExecutionResult[] = [];
 
   for (const rec of recommendations) {
     if (rec.action === "SKIP") continue;
 
-    const tokenId = findTokenId(rec);
+    const tokenId = findTokenId(rec, markets);
+    if (!tokenId) {
+      console.warn(`[executor] No token ID found for market ${rec.marketId} side ${rec.side}, skipping`);
+      continue;
+    }
 
     // Create pending trade record
     const trade = await prisma.trade.create({
@@ -88,16 +97,19 @@ export async function executeTrades(
       }
 
       if (orderResult.ok && orderResult.data) {
+        const data = orderResult.data;
+        const success = data.success !== false && data.status !== "REJECTED";
         const txHash =
-          orderResult.data.transactionsHashes?.[0] ??
-          orderResult.data.orderID ??
+          data.transaction_hashes?.[0] ??
+          data.order_id ??
           undefined;
 
         await prisma.trade.update({
           where: { id: trade.id },
           data: {
-            status: "filled",
+            status: success ? "filled" : "failed",
             txHash,
+            errorMsg: success ? undefined : (data.error_msg || data.status),
           },
         });
 
@@ -106,7 +118,7 @@ export async function executeTrades(
 
         results.push({
           recommendation: rec,
-          success: true,
+          success,
           tradeId: trade.id,
           txHash,
         });

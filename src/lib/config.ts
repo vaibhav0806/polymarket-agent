@@ -36,8 +36,8 @@ const STRATEGY_DEFAULTS: Omit<StrategyConfig, "id"> = {
 export async function getConfig(key: string): Promise<string | null> {
   const row = await prisma.config.findUnique({ where: { key } });
   if (row) return row.value;
-  // Fallback to environment variable (uppercase, underscored)
-  const envKey = key.toUpperCase().replace(/([A-Z])/g, "_$1").replace(/^_/, "");
+  // Fallback to environment variable (camelCase → UPPER_SNAKE_CASE)
+  const envKey = key.replace(/([A-Z])/g, "_$1").toUpperCase();
   return process.env[envKey] ?? process.env[key] ?? null;
 }
 

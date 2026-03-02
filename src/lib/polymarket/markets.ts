@@ -6,12 +6,18 @@ import type {
   ParsedMarketOutcome,
 } from "@/lib/polymarket/types";
 
-const NBA_QUERIES = [
-  "NBA",
-  "NBA basketball",
-  "NBA winner",
-  "NBA championship",
-];
+function getNBAQueries(): string[] {
+  // Use current year to find active-season markets
+  const now = new Date();
+  const year = now.getFullYear();
+  return [
+    `NBA ${year}`,
+    "NBA winner",
+    "NBA championship",
+    "NBA Finals",
+    "NBA MVP",
+  ];
+}
 
 // Real Polymarket market types from `polymarket sports market-types`
 const MARKET_TYPE_MAP: Record<string, MarketType> = {
@@ -120,11 +126,25 @@ async function fetchMidpoints(
   outcomes: ParsedMarketOutcome[]
 ): Promise<Record<string, number>> {
   const midpoints: Record<string, number> = {};
-  for (const outcome of outcomes) {
-    if (!outcome.tokenId) continue;
-    const result = await getMidpoint(outcome.tokenId);
-    if (result.ok && result.data) {
-      midpoints[outcome.tokenId] = parseFloat(result.data.midpoint);
+  const tokensToFetch = outcomes.filter((o) => o.tokenId);
+
+  // Fetch midpoints in parallel (batch of up to 10 at a time)
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < tokensToFetch.length; i += BATCH_SIZE) {
+    const batch = tokensToFetch.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map(async (outcome) => {
+        const result = await getMidpoint(outcome.tokenId);
+        if (result.ok && result.data) {
+          return { tokenId: outcome.tokenId, price: parseFloat(result.data.midpoint) };
+        }
+        return null;
+      })
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value) {
+        midpoints[r.value.tokenId] = r.value.price;
+      }
     }
   }
   return midpoints;
@@ -144,11 +164,14 @@ export async function discoverNBAMarkets(
   const allMarkets: Market[] = [];
 
   // Search with multiple queries to maximize coverage
-  for (const query of NBA_QUERIES) {
-    const result = await searchMarkets(query);
-    if (!result.ok || !result.data) continue;
+  const queries = getNBAQueries();
+  const searchResults = await Promise.allSettled(
+    queries.map((q) => searchMarkets(q))
+  );
 
-    for (const market of result.data) {
+  for (const sr of searchResults) {
+    if (sr.status !== "fulfilled" || !sr.value.ok || !sr.value.data) continue;
+    for (const market of sr.value.data) {
       if (seen.has(market.id)) continue;
       seen.add(market.id);
       allMarkets.push(market);
@@ -167,16 +190,27 @@ export async function discoverNBAMarkets(
     // Filter by team focus
     if (!marketMatchesTeams(market.question, focusTeams)) continue;
 
-    // Classify market type
+    // Classify market type — allow unknown types through (don't filter them out)
     const type = classifyMarket(market);
-    if (type !== "unknown" && !allowedTypes.includes(type)) continue;
+    if (type !== "unknown" && allowedTypes.length > 0 && !allowedTypes.includes(type)) continue;
 
     // Parse outcomes from JSON strings
     const outcomes = parseOutcomes(market);
     if (outcomes.length === 0) continue;
 
-    // Fetch live midpoint prices
-    const midpoints = await fetchMidpoints(outcomes);
+    // Use outcome prices from search results; only fetch midpoints if none available
+    const midpoints: Record<string, number> = {};
+    const hasPrices = outcomes.some((o) => o.price !== null);
+    if (hasPrices) {
+      for (const o of outcomes) {
+        if (o.tokenId && o.price !== null) {
+          midpoints[o.tokenId] = o.price;
+        }
+      }
+    }
+    // Markets without prices from the search results will have empty midpoints.
+    // We skip the midpoint CLI call here to avoid slow 404s for markets without order books.
+    // The LLM analyzer can still reason about these markets using other signals.
 
     enriched.push({
       id: market.id,

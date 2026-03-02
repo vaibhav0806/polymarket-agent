@@ -8,7 +8,7 @@ import type { Signal } from "@/lib/data/types";
 // --- LLM output schema ---
 
 export const RecommendationSchema = z.object({
-  marketId: z.string(),
+  marketId: z.coerce.string(), // LLM sometimes returns numeric IDs
   marketTitle: z.string(),
   action: z.enum(["BUY", "SELL", "SKIP"]),
   side: z.enum(["YES", "NO"]),

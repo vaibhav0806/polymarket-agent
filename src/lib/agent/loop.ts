@@ -167,7 +167,7 @@ async function runCycle(): Promise<void> {
     }
 
     // 5. Execute approved trades
-    const execResults = await executeTrades(approved, strategy, cycle.id);
+    const execResults = await executeTrades(approved, strategy, cycle.id, markets);
     const successfulTrades = execResults.filter((r) => r.success).length;
 
     // 6. Update cycle record
