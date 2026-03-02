@@ -1,5 +1,5 @@
 import { getConfig } from "@/lib/config";
-import type { Game, Standing, Injury, PlayerStats } from "@/lib/data/types";
+import type { Game, Standing, Injury, Team } from "@/lib/data/types";
 
 const BASE_URL = "https://api.balldontlie.io/v1";
 
@@ -9,7 +9,9 @@ async function fetchApi<T>(
 ): Promise<T[]> {
   const apiKey = await getConfig("balldontlieApiKey");
   if (!apiKey) {
-    console.warn("[sports] No BallDontLie API key configured, returning empty results");
+    console.warn(
+      "[sports] No BallDontLie API key configured, returning empty results"
+    );
     return [];
   }
 
@@ -27,7 +29,16 @@ async function fetchApi<T>(
     });
 
     if (!res.ok) {
-      console.error(`[sports] API error ${res.status}: ${res.statusText} for ${path}`);
+      // 401 = paid tier feature, 404 = endpoint doesn't exist
+      if (res.status === 401 || res.status === 404) {
+        console.warn(
+          `[sports] ${path} returned ${res.status} (likely requires paid tier), skipping`
+        );
+        return [];
+      }
+      console.error(
+        `[sports] API error ${res.status}: ${res.statusText} for ${path}`
+      );
       return [];
     }
 
@@ -51,11 +62,13 @@ function todayDateString(): string {
 
 function currentSeason(): number {
   const now = new Date();
-  // NBA season straddles years: 2024-2025 season starts in Oct 2024
-  // If we're in Jan-Jul, the season started the previous year
+  // NBA season straddles years: 2025-2026 season starts in Oct 2025
   return now.getMonth() < 8 ? now.getFullYear() - 1 : now.getFullYear();
 }
 
+/**
+ * Fetch today's NBA games. Works on free tier.
+ */
 export async function getGamesToday(): Promise<Game[]> {
   const today = todayDateString();
   return fetchApi<Game>("/games", {
@@ -63,6 +76,18 @@ export async function getGamesToday(): Promise<Game[]> {
   });
 }
 
+/**
+ * Fetch all NBA teams. Works on free tier.
+ * Useful as supplementary signal (team info for context).
+ */
+export async function getTeams(): Promise<Team[]> {
+  return fetchApi<Team>("/teams");
+}
+
+/**
+ * Fetch NBA standings. Requires paid BallDontLie tier.
+ * Degrades gracefully — returns empty array on free tier.
+ */
 export async function getStandings(): Promise<Standing[]> {
   const season = currentSeason();
   return fetchApi<Standing>("/standings", {
@@ -70,20 +95,19 @@ export async function getStandings(): Promise<Standing[]> {
   });
 }
 
+/**
+ * Fetch NBA injuries. Endpoint may not exist.
+ * Degrades gracefully — returns empty array.
+ */
 export async function getInjuries(): Promise<Injury[]> {
-  // The injuries endpoint may not be available on all BallDontLie tiers
-  try {
-    return await fetchApi<Injury>("/injuries");
-  } catch {
-    console.warn("[sports] Injuries endpoint not available, returning empty");
-    return [];
-  }
+  return fetchApi<Injury>("/injuries");
 }
 
-export async function getPlayerStats(playerId: number): Promise<PlayerStats[]> {
-  const season = currentSeason();
-  return fetchApi<PlayerStats>("/stats", {
-    "player_ids[]": String(playerId),
-    seasons: String(season),
+/**
+ * Search for a player by name. Works on free tier.
+ */
+export async function searchPlayers(name: string) {
+  return fetchApi<Record<string, unknown>>("/players", {
+    search: name,
   });
 }

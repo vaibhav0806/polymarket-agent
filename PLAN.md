@@ -56,9 +56,14 @@
 - [ ] Test `polymarket data positions` JSON response shape (requires open positions)
 
 ### BallDontLie API
-- [ ] Test with real API key — confirm v1 endpoints are still active
-- [ ] Verify response shapes for `/games`, `/standings`, `/injuries`
-- [ ] Check if injuries endpoint exists or needs alternative approach
+- [x] Test with real API key — v1 endpoints are active
+- [x] `/games` works on free tier — returns full game data with teams, scores, quarters, datetime
+- [x] `/teams` and `/players` work on free tier
+- [x] `/standings`, `/stats`, `/season_averages`, `/box_scores` require paid tier (401 Unauthorized)
+- [x] `/injuries` does not exist (404)
+- [x] Updated sports client: graceful degradation for paid-only endpoints, added `getTeams()` and `searchPlayers()`
+- [x] Updated Game schema to match real response (period, time, postseason, postponed, datetime)
+- [x] Updated Player schema (height, weight, jersey_number, college, country, draft info)
 
 ### Twitter/X
 - [ ] Test bearer token auth

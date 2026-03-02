@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// --- BallDontLie types ---
+// --- BallDontLie types (matches actual v1 API responses) ---
 
 export const TeamSchema = z.object({
   id: z.number(),
@@ -17,6 +17,14 @@ export const PlayerSchema = z.object({
   first_name: z.string(),
   last_name: z.string(),
   position: z.string().optional(),
+  height: z.string().nullable().optional(),
+  weight: z.string().nullable().optional(),
+  jersey_number: z.string().nullable().optional(),
+  college: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  draft_year: z.number().nullable().optional(),
+  draft_round: z.number().nullable().optional(),
+  draft_number: z.number().nullable().optional(),
   team: TeamSchema.optional(),
 });
 
@@ -25,11 +33,19 @@ export const GameSchema = z.object({
   date: z.string(),
   season: z.number(),
   status: z.string(),
-  home_team: TeamSchema,
-  visitor_team: TeamSchema,
+  period: z.number(),
+  time: z.string().nullable(),
+  postseason: z.boolean(),
+  postponed: z.boolean().optional(),
   home_team_score: z.number(),
   visitor_team_score: z.number(),
+  datetime: z.string().nullable().optional(),
+  home_team: TeamSchema,
+  visitor_team: TeamSchema,
 });
+
+// Standings and injuries are paid-tier only on BallDontLie.
+// We keep the types for future use but the fetchers degrade gracefully.
 
 export const StandingSchema = z.object({
   team: TeamSchema,
@@ -94,6 +110,7 @@ export const SignalTypeSchema = z.enum([
   "standing",
   "tweet",
   "market",
+  "team",
 ]);
 
 export const SignalSchema = z.object({
