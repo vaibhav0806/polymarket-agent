@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Config {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Strategy {
+  id               Int      @id @default(autoincrement())
+  focusTeams       String   @default("[]") // JSON array of team codes
+  marketTypes      String   @default("[\"game_winner\",\"spread\",\"player_prop\",\"futures\"]")
+  riskTolerance    String   @default("moderate") // conservative | moderate | aggressive
+  maxPositionSize  Float    @default(10)
+  maxTotalExposure Float    @default(100)
+  minConfidence    Float    @default(0.6)
+  maxDailyTrades   Int      @default(10)
+  maxDailyLoss     Float    @default(50)
+  orderType        String   @default("market") // market | limit
+  pollIntervalMs   Int      @default(300000) // 5 min
+  llmModel         String   @default("gpt-4o-mini")
+  customRules      String   @default("")
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Trade {
+  id          Int      @id @default(autoincrement())
+  marketId    String
+  marketTitle String
+  side        String   // YES | NO
+  action      String   // BUY | SELL
+  amount      Float
+  price       Float
+  confidence  Float
+  reasoning   String
+  status      String   @default("pending") // pending | filled | failed | cancelled
+  txHash      String?
+  errorMsg    String?
+  cycleId     Int?
+  createdAt   DateTime @default(now())
+
+  @@index([marketId])
+  @@index([createdAt])
+}
+
+model Signal {
+  id        Int      @id @default(autoincrement())
+  source    String   // twitter | balldontlie | polymarket
+  type      String   // injury | score | standing | tweet | market
+  data      String   // JSON blob
+  cycleId   Int?
+  createdAt DateTime @default(now())
+
+  @@index([source])
+  @@index([createdAt])
+}
+
+model AgentCycle {
+  id             Int      @id @default(autoincrement())
+  status         String   // running | completed | error
+  marketsFound   Int      @default(0)
+  signalsFetched Int      @default(0)
+  tradesExecuted Int      @default(0)
+  errorMsg       String?
+  durationMs     Int?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Position {
+  id          Int      @id @default(autoincrement())
+  marketId    String   @unique
+  marketTitle String
+  side        String
+  size        Float
+  avgPrice    Float
+  currentPrice Float?
+  pnl         Float?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
