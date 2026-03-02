@@ -115,7 +115,11 @@ export async function validateSetup(): Promise<SetupValidation> {
   if (walletAccessible) {
     const approvalResult = await checkApproval();
     if (approvalResult.ok && approvalResult.data) {
-      approvalsSet = approvalResult.data.approved;
+      // approvalResult.data is an array of contract approval entries
+      const allApproved = approvalResult.data.every(
+        (entry) => entry.ctf_approved && entry.usdc_approved
+      );
+      approvalsSet = allApproved;
       if (!approvalsSet) {
         // Try to set approvals automatically
         const setResult = await setApproval();

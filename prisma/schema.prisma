@@ -17,7 +17,7 @@ model Config {
 model Strategy {
   id               Int      @id @default(autoincrement())
   focusTeams       String   @default("[]") // JSON array of team codes
-  marketTypes      String   @default("[\"game_winner\",\"spread\",\"player_prop\",\"futures\"]")
+  marketTypes      String   @default("[\"moneyline\",\"spreads\",\"totals\",\"player_prop\",\"futures\"]")
   riskTolerance    String   @default("moderate") // conservative | moderate | aggressive
   maxPositionSize  Float    @default(10)
   maxTotalExposure Float    @default(100)

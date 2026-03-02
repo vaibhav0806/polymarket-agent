@@ -19,7 +19,7 @@ export interface StrategyConfig {
 
 const STRATEGY_DEFAULTS: Omit<StrategyConfig, "id"> = {
   focusTeams: [],
-  marketTypes: ["game_winner", "spread", "player_prop", "futures"],
+  marketTypes: ["moneyline", "spreads", "totals", "player_prop", "futures"],
   riskTolerance: "moderate",
   maxPositionSize: 10,
   maxTotalExposure: 100,

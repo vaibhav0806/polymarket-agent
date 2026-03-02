@@ -82,7 +82,7 @@ function buildUserPrompt(
           .join(", ")
       : "prices unavailable";
     sections.push(
-      `[${market.type}] ${market.title} (ID: ${market.id}) - ${prices}`
+      `[${market.type}] ${market.question} (ID: ${market.id}) - ${prices}`
     );
   }
 

@@ -1,15 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getPositions } from "@/lib/polymarket/cli";
+import { getPositions, getWalletAddress } from "@/lib/polymarket/cli";
 
 export async function GET() {
   try {
-    const [dbPositions, liveResult] = await Promise.all([
-      prisma.position.findMany(),
-      getPositions(),
-    ]);
+    // Get DB positions first
+    const dbPositions = await prisma.position.findMany();
 
-    const livePositions = liveResult.ok && liveResult.data ? liveResult.data : [];
+    // Try to get live positions (requires wallet address)
+    let livePositions: Record<string, unknown>[] = [];
+    try {
+      const walletResult = await getWalletAddress();
+      if (walletResult.ok && walletResult.data) {
+        const liveResult = await getPositions(walletResult.data.address);
+        if (liveResult.ok && liveResult.data) {
+          livePositions = liveResult.data;
+        }
+      }
+    } catch {
+      // Live fetch is best-effort
+    }
 
     const positionMap = new Map<string, Record<string, unknown>>();
 
@@ -18,7 +28,11 @@ export async function GET() {
     }
 
     for (const pos of livePositions) {
-      const marketId = pos.marketId ?? pos.tokenId;
+      const marketId =
+        (pos as Record<string, string>).conditionId ??
+        (pos as Record<string, string>).asset ??
+        "";
+      if (!marketId) continue;
       const existing = positionMap.get(marketId);
       if (existing) {
         positionMap.set(marketId, { ...existing, ...pos, source: "merged" });
@@ -29,7 +43,8 @@ export async function GET() {
 
     return NextResponse.json({ positions: Array.from(positionMap.values()) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch positions";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

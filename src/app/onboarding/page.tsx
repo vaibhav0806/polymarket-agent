@@ -22,8 +22,9 @@ const NBA_TEAMS = [
 ];
 
 const MARKET_TYPES = [
-  { value: "game_winner", label: "Game Winner" },
-  { value: "spread", label: "Spread" },
+  { value: "moneyline", label: "Moneyline" },
+  { value: "spreads", label: "Spreads" },
+  { value: "totals", label: "Totals" },
   { value: "player_prop", label: "Player Props" },
   { value: "futures", label: "Futures" },
 ];
@@ -55,8 +56,9 @@ export default function OnboardingPage() {
   const [maxTotalExposure, setMaxTotalExposure] = useState(100);
   const [customRules, setCustomRules] = useState("");
   const [marketTypes, setMarketTypes] = useState<string[]>([
-    "game_winner",
-    "spread",
+    "moneyline",
+    "spreads",
+    "totals",
     "player_prop",
     "futures",
   ]);

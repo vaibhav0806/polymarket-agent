@@ -1,29 +1,55 @@
 import { searchMarkets, getMidpoint } from "@/lib/polymarket/cli";
-import type { EnrichedMarket, MarketType, Market } from "@/lib/polymarket/types";
+import type {
+  EnrichedMarket,
+  MarketType,
+  Market,
+  ParsedMarketOutcome,
+} from "@/lib/polymarket/types";
 
 const NBA_QUERIES = [
   "NBA",
-  "NBA basketball winner",
-  "NBA spread",
-  "NBA player props",
+  "NBA basketball",
+  "NBA winner",
   "NBA championship",
 ];
 
-function classifyMarket(title: string): MarketType {
-  const lower = title.toLowerCase();
+// Real Polymarket market types from `polymarket sports market-types`
+const MARKET_TYPE_MAP: Record<string, MarketType> = {
+  moneyline: "moneyline",
+  spreads: "spreads",
+  totals: "totals",
+  points: "player_prop",
+  rebounds: "player_prop",
+  assists: "player_prop",
+  threes: "player_prop",
+  assists_points_rebounds: "player_prop",
+  double_doubles: "player_prop",
+};
+
+function classifyMarket(market: Market): MarketType {
+  // Prefer the sportsMarketType field if set
+  if (market.sportsMarketType) {
+    const mapped = MARKET_TYPE_MAP[market.sportsMarketType];
+    if (mapped) return mapped;
+  }
+
+  // Fallback to title heuristics
+  const lower = market.question.toLowerCase();
   if (
     lower.includes("spread") ||
     lower.includes("cover") ||
-    lower.includes("point")
+    lower.includes("handicap")
   ) {
-    return "spread";
+    return "spreads";
+  }
+  if (lower.includes("total") || lower.includes("over/under")) {
+    return "totals";
   }
   if (
     lower.includes("points") ||
     lower.includes("rebounds") ||
     lower.includes("assists") ||
-    lower.includes("over") ||
-    lower.includes("under") ||
+    lower.includes("threes") ||
     lower.includes("prop")
   ) {
     return "player_prop";
@@ -33,36 +59,72 @@ function classifyMarket(title: string): MarketType {
     lower.includes("mvp") ||
     lower.includes("finals") ||
     lower.includes("win the") ||
-    lower.includes("make the playoffs")
+    lower.includes("make the playoffs") ||
+    lower.includes("regular season")
   ) {
     return "futures";
   }
   if (
-    lower.includes("win") ||
-    lower.includes("vs") ||
-    lower.includes("beat") ||
-    lower.includes("defeat")
+    lower.includes(" vs") ||
+    lower.includes(" vs.") ||
+    lower.includes("win")
   ) {
-    return "game_winner";
+    return "moneyline";
   }
   return "unknown";
 }
 
-function marketMatchesTeams(market: Market, focusTeams: string[]): boolean {
+function parseOutcomes(market: Market): ParsedMarketOutcome[] {
+  const outcomes: ParsedMarketOutcome[] = [];
+
+  let titles: string[] = [];
+  let tokenIds: string[] = [];
+  let prices: string[] = [];
+
+  try {
+    titles = JSON.parse(market.outcomes);
+  } catch {
+    return outcomes;
+  }
+
+  try {
+    tokenIds = market.clobTokenIds ? JSON.parse(market.clobTokenIds) : [];
+  } catch {
+    tokenIds = [];
+  }
+
+  try {
+    prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [];
+  } catch {
+    prices = [];
+  }
+
+  for (let i = 0; i < titles.length; i++) {
+    outcomes.push({
+      title: titles[i],
+      tokenId: tokenIds[i] ?? "",
+      price: prices[i] ? parseFloat(prices[i]) : null,
+    });
+  }
+
+  return outcomes;
+}
+
+function marketMatchesTeams(question: string, focusTeams: string[]): boolean {
   if (focusTeams.length === 0) return true;
-  const titleLower = market.title.toLowerCase();
-  return focusTeams.some((team) => titleLower.includes(team.toLowerCase()));
+  const lower = question.toLowerCase();
+  return focusTeams.some((team) => lower.includes(team.toLowerCase()));
 }
 
 async function fetchMidpoints(
-  market: Market
+  outcomes: ParsedMarketOutcome[]
 ): Promise<Record<string, number>> {
   const midpoints: Record<string, number> = {};
-  for (const outcome of market.outcomes) {
+  for (const outcome of outcomes) {
     if (!outcome.tokenId) continue;
     const result = await getMidpoint(outcome.tokenId);
     if (result.ok && result.data) {
-      midpoints[outcome.tokenId] = result.data.mid;
+      midpoints[outcome.tokenId] = parseFloat(result.data.midpoint);
     }
   }
   return midpoints;
@@ -70,7 +132,13 @@ async function fetchMidpoints(
 
 export async function discoverNBAMarkets(
   focusTeams: string[] = [],
-  allowedTypes: string[] = ["game_winner", "spread", "player_prop", "futures"]
+  allowedTypes: string[] = [
+    "moneyline",
+    "spreads",
+    "totals",
+    "player_prop",
+    "futures",
+  ]
 ): Promise<EnrichedMarket[]> {
   const seen = new Set<string>();
   const allMarkets: Market[] = [];
@@ -87,24 +155,40 @@ export async function discoverNBAMarkets(
     }
   }
 
-  // Filter by team focus and market type
+  // Filter and enrich
   const enriched: EnrichedMarket[] = [];
   for (const market of allMarkets) {
-    if (!marketMatchesTeams(market, focusTeams)) continue;
-
-    const type = classifyMarket(market.title);
-    if (type !== "unknown" && !allowedTypes.includes(type)) continue;
-
-    // Skip closed/inactive markets
+    // Skip closed markets
     if (market.closed) continue;
 
-    // Fetch current midpoint prices
-    const midpoints = await fetchMidpoints(market);
+    // Skip markets not accepting orders
+    if (market.acceptingOrders === false) continue;
+
+    // Filter by team focus
+    if (!marketMatchesTeams(market.question, focusTeams)) continue;
+
+    // Classify market type
+    const type = classifyMarket(market);
+    if (type !== "unknown" && !allowedTypes.includes(type)) continue;
+
+    // Parse outcomes from JSON strings
+    const outcomes = parseOutcomes(market);
+    if (outcomes.length === 0) continue;
+
+    // Fetch live midpoint prices
+    const midpoints = await fetchMidpoints(outcomes);
 
     enriched.push({
-      ...market,
+      id: market.id,
+      question: market.question,
+      slug: market.slug ?? undefined,
+      description: market.description ?? undefined,
+      outcomes,
       type,
       midpoints,
+      closed: !!market.closed,
+      volume: market.volumeNum ? parseFloat(market.volumeNum) : 0,
+      sportsMarketType: market.sportsMarketType ?? null,
     });
   }
 

@@ -17,8 +17,9 @@ const NBA_TEAMS = [
 ];
 
 const MARKET_TYPES = [
-  { value: "game_winner", label: "Game Winner" },
-  { value: "spread", label: "Spread" },
+  { value: "moneyline", label: "Moneyline" },
+  { value: "spreads", label: "Spreads" },
+  { value: "totals", label: "Totals" },
   { value: "player_prop", label: "Player Props" },
   { value: "futures", label: "Futures" },
 ];
@@ -40,7 +41,7 @@ interface Strategy {
 
 const defaultStrategy: Strategy = {
   focusTeams: [],
-  marketTypes: ["game_winner", "spread", "player_prop", "futures"],
+  marketTypes: ["moneyline", "spreads", "totals", "player_prop", "futures"],
   riskTolerance: "moderate",
   maxPositionSize: 10,
   maxTotalExposure: 100,

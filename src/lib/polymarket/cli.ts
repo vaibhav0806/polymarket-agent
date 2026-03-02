@@ -25,7 +25,7 @@ const CLI_TIMEOUT = 30_000;
 const MAX_BUFFER = 10 * 1024 * 1024; // 10MB
 const CLI_BINARY = "polymarket";
 
-interface CliResult<T> {
+export interface CliResult<T> {
   ok: boolean;
   data?: T;
   error?: string;
@@ -46,6 +46,12 @@ function runCli(args: string[]): Promise<string> {
       },
       (error, stdout, stderr) => {
         if (error) {
+          // Some CLI errors still output valid JSON to stderr or stdout
+          const output = stdout?.trim() || stderr?.trim() || "";
+          if (output.startsWith("{") || output.startsWith("[")) {
+            resolve(output);
+            return;
+          }
           reject(
             new Error(
               `CLI error (${args.join(" ")}): ${error.message}${stderr ? ` | stderr: ${stderr}` : ""}`
@@ -62,7 +68,12 @@ function runCli(args: string[]): Promise<string> {
 function parseJson(raw: string): unknown {
   const trimmed = raw.trim();
   if (!trimmed) throw new Error("CLI returned empty output");
-  return JSON.parse(trimmed);
+  // Handle CLI that prints errors as JSON with an "error" field
+  const parsed = JSON.parse(trimmed);
+  if (parsed && typeof parsed === "object" && "error" in parsed && !Array.isArray(parsed)) {
+    throw new Error(parsed.error);
+  }
+  return parsed;
 }
 
 function wrapResult<T>(schema: z.ZodType<T>) {
@@ -92,6 +103,7 @@ export async function getMidpoint(
   return wrapResult(MidpointSchema)(["clob", "midpoint", tokenId]);
 }
 
+// market-order flags: --token, --side (buy|sell), --amount
 export async function createMarketOrder(
   tokenId: string,
   side: "BUY" | "SELL",
@@ -100,32 +112,33 @@ export async function createMarketOrder(
   return wrapResult(OrderResultSchema)([
     "clob",
     "market-order",
-    "--token-id",
+    "--token",
     tokenId,
     "--side",
-    side,
+    side.toLowerCase(),
     "--amount",
     String(amount),
   ]);
 }
 
+// create-order flags: --token, --side (buy|sell), --price, --size
 export async function createLimitOrder(
   tokenId: string,
   side: "BUY" | "SELL",
-  amount: number,
+  size: number,
   price: number
 ): Promise<CliResult<OrderResult>> {
   return wrapResult(OrderResultSchema)([
     "clob",
     "create-order",
-    "--token-id",
+    "--token",
     tokenId,
     "--side",
-    side,
-    "--amount",
-    String(amount),
+    side.toLowerCase(),
     "--price",
     String(price),
+    "--size",
+    String(size),
   ]);
 }
 
@@ -133,8 +146,11 @@ export async function getOrders(): Promise<CliResult<OrderList>> {
   return wrapResult(OrderListSchema)(["clob", "orders"]);
 }
 
-export async function getPositions(): Promise<CliResult<PositionList>> {
-  return wrapResult(PositionListSchema)(["data", "positions"]);
+// data positions requires a wallet address as positional arg
+export async function getPositions(
+  address: string
+): Promise<CliResult<PositionList>> {
+  return wrapResult(PositionListSchema)(["data", "positions", address]);
 }
 
 export async function getWalletAddress(): Promise<CliResult<WalletAddress>> {
