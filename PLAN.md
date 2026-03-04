@@ -52,8 +52,8 @@
 - [x] Adjust all zod schemas to match real CLI output (passthrough for flexibility)
 - [x] Fix market types to use real Polymarket types: moneyline, spreads, totals, player_prop, futures
 - [x] Fix market discovery to parse JSON-encoded string fields (outcomes, clobTokenIds, outcomePrices)
-- [ ] Test `polymarket clob market-order` and `create-order` JSON response shapes (requires funded wallet)
-- [ ] Test `polymarket data positions` JSON response shape (requires open positions)
+- [x] Test `polymarket clob market-order` and `create-order` JSON response shapes — confirmed with live trades, snake_case fields
+- [x] Test `polymarket data positions` JSON response shape — confirmed with 4 open positions via CLI
 
 ### BallDontLie API
 - [x] Test with real API key — v1 endpoints are active
@@ -66,21 +66,39 @@
 - [x] Updated Player schema (height, weight, jersey_number, college, country, draft info)
 
 ### Twitter/X
-- [x] Test bearer token auth — token authenticates but app is not attached to a developer Project
-- [x] X API v2 search requires Basic tier ($100/mo) minimum; free-tier tokens get `client-not-enrolled`
+- [x] Test bearer token auth — token authenticates but all v2 endpoints return `client-not-enrolled`
+- [x] New `console.x.com` pay-per-use apps also get `client-not-enrolled` — known platform issue, no code fix
 - [x] v1.1 search also blocked (code 453)
-- [x] Code already degrades gracefully (returns empty array), improved error logging for this specific case
-- [ ] To enable tweets: attach the app to a Project in the X developer portal and upgrade to Basic tier
+- [x] Code degrades gracefully (returns empty array), clear warning logged
+- [x] New bearer token works — v2 search returns real NBA tweets
+- [x] `twitter-api-v2` library confirmed working with the token
+- [x] Fixed `getConfig()` env var fallback (camelCase→UPPER_SNAKE_CASE conversion was broken)
 
 ### End-to-End Flow
-- [ ] Onboard with real keys (orchestrator key path)
-- [ ] Onboard with real keys (manual entry path)
-- [ ] Start agent → verify market discovery works
-- [ ] Verify signals are fetched and logged to DB
-- [ ] Verify LLM receives correct prompt and returns valid structured output
-- [ ] Verify risk filters apply correctly
-- [ ] Verify trades execute and appear in history
-- [ ] Verify positions update after trades
+- [ ] Onboard with real keys (orchestrator key path) — not yet tested via UI
+- [x] Onboard with real keys (manual entry path) — fixed field name mismatch between UI and API routes
+- [x] Start agent → verify market discovery works — 131 open NBA markets found
+- [x] Verify signals are fetched and logged to DB — agent cycle logs to AgentCycle table
+- [x] Fixed MarketSchema: made fields nullable/passthrough to handle real API inconsistencies
+- [x] Fixed search queries: year-aware (`NBA 2026`) instead of generic (`NBA`) which returned stale 2024 data
+- [x] Fixed market discovery performance: parallel searches, skip midpoint calls when prices available
+- [x] Verify LLM receives correct prompt and returns valid structured output — GPT-4o-mini returns actionable recommendations with reasoning
+- [x] Fixed `RecommendationSchema.marketId` to use `z.coerce.string()` (LLM returns numeric IDs)
+- [x] Verify risk filters apply correctly — confidence threshold and position size caps enforced
+- [x] Verify trades attempt execution and appear in history — 5 trades logged with reasoning (fail at order book stage without funded wallet)
+- [x] Verify signals logged to DB — 30 game scores + 60 tweets across cycles
+- [x] **Live trades executed** — 3 trades filled on Polymarket (Rockets Finals, Heat SE Division, SGA MVP)
+- [x] Fixed token ID resolution: executor now maps marketId+side → CLOB token ID via enriched markets
+- [x] Fixed OrderResultSchema to match real CLI output (snake_case fields: `order_id`, `transaction_hashes`, `error_msg`)
+- [x] Fixed wallet setup: EOA mode with USDC.e funding (proxy mode requires proxy contract deployment)
+- [x] Positions tracked in DB and served via API — 3 open positions after live trades
+- [x] Fixed onboarding field name mismatch: UI sends `openaiKey`/`polymarketKey`, backend now accepts both short and long names
+- [x] Fixed dashboard market rendering: updated Market interface to match `EnrichedMarket` (id, outcomes as objects with prices)
+- [x] Fixed operator precedence bug in `findTokenId()` fallback clause
+- [x] Fixed position avgPrice: was using `rec.confidence` (0-1) as price proxy, now uses actual outcome price from enriched market
+- [x] Fixed README: corrected market type names (`game_winner`→`moneyline`, `spread`→`spreads`, added `totals`)
+- [x] Fixed configure route: now stores optional Twitter/BallDontLie keys during manual entry
+- [x] Rewrote `SKILL.md` to match real system (correct CLI commands, API routes, strategy config, setup instructions)
 - [ ] Test circuit breaker (set low maxDailyLoss, confirm agent stops trading)
 - [ ] Test custom rules (add a rule, confirm LLM respects it)
 

@@ -31,7 +31,7 @@ function findTokenId(
   // Fallback: try to find by title match
   const sideLabel = recommendation.side.toLowerCase();
   const match = market.outcomes.find(
-    (o) => o.title.toLowerCase() === sideLabel || o.title.toLowerCase() === "yes" && recommendation.side === "YES"
+    (o) => o.title.toLowerCase() === sideLabel
   );
   return match?.tokenId ?? null;
 }
@@ -113,8 +113,11 @@ export async function executeTrades(
           },
         });
 
-        // Upsert position
-        await upsertPosition(rec);
+        // Upsert position — use outcome price from enriched market as execution price
+        const mkt = markets.find((m) => m.id === rec.marketId);
+        const sideIdx = rec.side === "YES" ? 0 : 1;
+        const execPrice = mkt?.outcomes[sideIdx]?.price ?? 0.5;
+        await upsertPosition(rec, execPrice);
 
         results.push({
           recommendation: rec,
@@ -161,7 +164,7 @@ export async function executeTrades(
   return results;
 }
 
-async function upsertPosition(rec: Recommendation): Promise<void> {
+async function upsertPosition(rec: Recommendation, executionPrice: number): Promise<void> {
   const existing = await prisma.position.findUnique({
     where: { marketId: rec.marketId },
   });
@@ -174,7 +177,7 @@ async function upsertPosition(rec: Recommendation): Promise<void> {
     if (rec.action === "BUY" && isSameSide) {
       // Adding to position
       const totalCost =
-        existing.avgPrice * existing.size + rec.confidence * rec.amount;
+        existing.avgPrice * existing.size + executionPrice * rec.amount;
       newSize = existing.size + rec.amount;
       newAvgPrice = newSize > 0 ? totalCost / newSize : existing.avgPrice;
     } else if (rec.action === "SELL" && isSameSide) {
@@ -206,7 +209,7 @@ async function upsertPosition(rec: Recommendation): Promise<void> {
         marketTitle: rec.marketTitle,
         side: rec.side,
         size: rec.amount,
-        avgPrice: rec.confidence, // Using confidence as proxy for expected price
+        avgPrice: executionPrice,
       },
     });
   }

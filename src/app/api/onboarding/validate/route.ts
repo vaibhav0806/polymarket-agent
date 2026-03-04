@@ -4,7 +4,10 @@ import { decodeOrchestratorKey, validateSetup } from "@/lib/orchestrator";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orchestratorKey, openaiApiKey, polymarketPrivateKey } = body;
+    const { orchestratorKey } = body;
+    // Accept both long names (from orchestrator decode) and short names (from UI manual entry)
+    const openaiApiKey = body.openaiApiKey || body.openaiKey;
+    const polymarketPrivateKey = body.polymarketPrivateKey || body.polymarketKey;
     const errors: string[] = [];
 
     if (orchestratorKey) {

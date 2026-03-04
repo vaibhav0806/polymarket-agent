@@ -20,181 +20,164 @@ metadata:
 
 ## Overview
 
-This skill digests real-time NBA sports data from multiple sources (balldontlie API, Twitter/X, official NBA feeds), analyzes it using an LLM (OpenAI), and executes trades on Polymarket prediction markets. The agent continuously polls for new data, evaluates market conditions against its strategy configuration, and places or adjusts positions on NBA-related Polymarket markets.
+This skill digests real-time NBA sports data from multiple sources (BallDontLie API, Twitter/X sentiment), analyzes it using an LLM (OpenAI), and executes trades on Polymarket prediction markets via the Polymarket CLI. The agent runs as an in-process polling loop using `setInterval` inside a long-running Node.js process -- it is not serverless compatible.
 
-The agent operates as a background loop:
-1. **Ingest** -- Pull latest NBA scores, player stats, injury reports, and social sentiment.
+Each cycle follows four steps:
+
+1. **Ingest** -- Pull latest NBA games, player data, and optionally social sentiment from Twitter/X.
 2. **Analyze** -- Feed structured data into the LLM to produce trade signals with confidence scores.
-3. **Execute** -- Submit buy/sell orders to Polymarket via the Polymarket CLI when signals exceed the configured confidence threshold.
-4. **Record** -- Log every decision and trade to the local database for auditability and performance tracking.
+3. **Execute** -- Submit buy/sell orders to Polymarket via CLI subprocess calls when signals exceed the configured confidence threshold.
+4. **Record** -- Log every decision and trade to the local SQLite database (via Prisma) for auditability and performance tracking.
 
 ## Orchestrator Key
 
-The orchestrator key is a signed JSON blob that authorizes this skill to act on behalf of a user's Polymarket account. It encodes the user's wallet address, allowed market scopes, risk limits, and an expiration timestamp.
+The orchestrator key is a base64url-encoded JSON blob containing API credentials. The user pastes it into the onboarding wizard UI, which decodes it and stores the individual keys in the database.
 
 ### Key Format
 
+The decoded JSON payload:
+
 ```json
 {
-  "version": 1,
-  "wallet": "0xYOUR_WALLET_ADDRESS",
-  "scope": ["nba"],
-  "maxPositionUsd": 100,
-  "maxDailyVolumeUsd": 500,
-  "expiresAt": "2026-12-31T23:59:59Z",
-  "signature": "0xSIGNATURE_HEX"
+  "polymarketPrivateKey": "0x...",
+  "openaiApiKey": "sk-...",
+  "twitterBearerToken": "AAAA...",
+  "balldontlieApiKey": "uuid-here",
+  "defaultStrategy": { }
 }
 ```
 
-### Generating an Orchestrator Key
+Only `polymarketPrivateKey` and `openaiApiKey` are required. `twitterBearerToken`, `balldontlieApiKey`, and `defaultStrategy` are optional -- the agent degrades gracefully without them.
 
-```bash
-polymarket auth generate-key \
-  --scope nba \
-  --max-position 100 \
-  --max-daily-volume 500 \
-  --expires 2026-12-31
+### Encoding
+
+The key is produced by base64url-encoding the JSON:
+
+```javascript
+btoa(JSON.stringify(payload))
 ```
 
-The CLI will prompt you to sign with the private key corresponding to `POLYMARKET_PRIVATE_KEY`. Store the resulting key securely; it is required at agent startup.
+The resulting string is what the user pastes into the onboarding UI. The UI decodes it, validates the credentials via `POST /api/onboarding/validate`, and then applies the configuration via `POST /api/onboarding/configure`.
 
 ## CLI Commands
 
-The agent invokes the following Polymarket CLI commands during operation:
+All commands are invoked with `polymarket -o json` and executed via `child_process.execFile`. The agent parses the JSON stdout to drive its logic.
 
 | Command | Purpose |
 |---|---|
-| `polymarket auth generate-key` | Generate an orchestrator key for the agent |
-| `polymarket auth verify-key` | Verify an orchestrator key is valid and not expired |
-| `polymarket markets list --tag nba` | List all active NBA prediction markets |
-| `polymarket markets get <market-id>` | Fetch details and current prices for a specific market |
-| `polymarket order buy` | Place a buy order on a market outcome |
-| `polymarket order sell` | Place a sell order on a market outcome |
-| `polymarket order cancel <order-id>` | Cancel a pending order |
-| `polymarket positions list` | List all current open positions |
-| `polymarket positions get <position-id>` | Get details on a specific position |
-| `polymarket balance` | Check the wallet's USDC balance |
+| `polymarket markets search "<query>"` | Search for markets by keyword |
+| `polymarket clob midpoint <tokenId>` | Get midpoint price for a token (positional arg) |
+| `polymarket clob market-order --token <id> --side buy/sell --amount <usd>` | Place a market order |
+| `polymarket clob create-order --token <id> --side buy/sell --price <p> --size <n>` | Place a limit order |
+| `polymarket clob balance --asset-type collateral` | Check USDC.e balance in CLOB |
+| `polymarket clob update-balance --asset-type collateral` | Refresh CLOB balance from on-chain state |
+| `polymarket data positions <walletAddress>` | List open positions (positional arg) |
+| `polymarket wallet address` | Get configured wallet address |
+| `polymarket wallet show` | Show wallet info including proxy address and signature type |
+| `polymarket approve check` | Check contract approval status (returns array) |
+| `polymarket approve set` | Set contract approvals for trading (6 approval transactions) |
+| `polymarket sports market-types` | List valid sports market types |
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | Yes | OpenAI API key for LLM analysis calls |
-| `POLYMARKET_PRIVATE_KEY` | Yes | Ethereum private key for signing Polymarket transactions |
-| `TWITTER_BEARER_TOKEN` | No | Twitter/X API bearer token for social sentiment ingestion |
-| `BALLDONTLIE_API_KEY` | No | API key for balldontlie.io NBA data (higher rate limits) |
-| `DATABASE_URL` | No | Prisma database connection string (defaults to `file:./prisma/dev.db`) |
-| `POLL_INTERVAL_MS` | No | Milliseconds between data polling cycles (default: `300000` / 5 min) |
+| `OPENAI_API_KEY` | Yes | OpenAI API key for LLM analysis |
+| `POLYMARKET_PRIVATE_KEY` | Yes | Ethereum private key (configured via `polymarket wallet import` or `polymarket setup`) |
+| `TWITTER_BEARER_TOKEN` | No | X/Twitter API bearer token for NBA tweet sentiment (requires v2 search access) |
+| `BALLDONTLIE_API_KEY` | No | BallDontLie API key for NBA game data (free tier: /games, /teams, /players only) |
+| `DATABASE_URL` | No | Prisma database connection string (default: `file:./dev.db`) |
+| `POLL_INTERVAL_MS` | No | Milliseconds between polling cycles (default: `300000` / 5 min) |
 | `LLM_MODEL` | No | OpenAI model to use for analysis (default: `gpt-4o-mini`) |
 
-## Strategy Customization
+## Strategy Configuration
 
-Strategy is configured via the dashboard UI or by passing a JSON config object to the agent's API. Available options:
+Strategy is configured via the dashboard UI or by calling `PUT /api/strategy` with a JSON body. The full `StrategyConfig` interface:
 
-### `focusTeams`
-Array of NBA team abbreviations to restrict analysis to. When set, the agent only trades on markets involving these teams.
-```json
-{ "focusTeams": ["LAL", "BOS", "GSW"] }
-```
-
-### `riskTolerance`
-Controls position sizing and confidence thresholds. One of `"conservative"`, `"moderate"`, or `"aggressive"`.
-- **conservative** -- Minimum 85% LLM confidence to trade, max 5% of balance per position.
-- **moderate** -- Minimum 70% confidence, max 15% of balance per position.
-- **aggressive** -- Minimum 55% confidence, max 30% of balance per position.
-
-```json
-{ "riskTolerance": "moderate" }
-```
-
-### `customRules`
-Array of natural-language rules injected into the LLM system prompt to bias or constrain its analysis.
-```json
-{
-  "customRules": [
-    "Never bet against teams on a 5+ game win streak",
-    "Weight injury reports higher than season averages",
-    "Avoid player prop markets"
-  ]
+```typescript
+interface StrategyConfig {
+  focusTeams: string[];              // NBA team names, empty = all teams
+  marketTypes: string[];             // "moneyline" | "spreads" | "totals" | "player_prop" | "futures"
+  riskTolerance: "conservative" | "moderate" | "aggressive";
+  maxPositionSize: number;           // Max USDC per trade
+  maxTotalExposure: number;          // Max total open USDC across all positions
+  minConfidence: number;             // 0-1, LLM confidence threshold to trigger a trade
+  maxDailyTrades: number;            // Max trades per day
+  maxDailyLoss: number;              // Circuit breaker -- stops trading if daily loss exceeds this
+  orderType: "market" | "limit";
+  pollIntervalMs: number;            // ms between cycles (default 300000)
+  llmModel: string;                  // OpenAI model (default "gpt-4o-mini")
+  customRules: string;               // Plain English rules injected into the LLM system prompt
 }
 ```
 
-### `maxPositionUsd`
-Hard cap on the USD value of any single position. Overrides the orchestrator key limit if lower.
+### Key Fields
+
+**focusTeams** -- Array of NBA team names to restrict analysis to. When empty, the agent considers all teams.
 ```json
-{ "maxPositionUsd": 50 }
+{ "focusTeams": ["Lakers", "Celtics", "Warriors"] }
 ```
 
-### `maxDailyVolumeUsd`
-Hard cap on total USD volume traded per 24-hour rolling window.
+**marketTypes** -- Array of market types the agent is allowed to trade.
 ```json
-{ "maxDailyVolumeUsd": 200 }
+{ "marketTypes": ["moneyline", "spreads", "totals"] }
 ```
 
-### `enabledMarketTypes`
-Array of market types the agent is allowed to trade. Options: `"game-winner"`, `"spread"`, `"total-points"`, `"player-props"`, `"futures"`.
+**riskTolerance** -- Controls position sizing behavior. One of `"conservative"`, `"moderate"`, or `"aggressive"`.
+
+**minConfidence** -- Float between 0 and 1. The LLM must produce a confidence score above this threshold for the agent to place a trade.
+
+**maxDailyLoss** -- Circuit breaker. If the agent's realized losses for the current day exceed this USDC amount, it stops placing new trades until the next day.
+
+**orderType** -- Whether to use `"market"` orders (immediate fill at midpoint) or `"limit"` orders (placed at a specific price and size).
+
+**customRules** -- A plain English string injected directly into the LLM system prompt to bias or constrain its analysis.
 ```json
-{ "enabledMarketTypes": ["game-winner", "spread"] }
+{ "customRules": "Never bet against teams on a 5+ game win streak. Weight injury reports higher than season averages." }
 ```
 
 ## API Endpoints
 
-The Next.js app exposes the following API routes for interacting with the agent:
+The Next.js app exposes the following API routes:
 
-| Method | Endpoint | Description |
+| Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/agent/status` | Returns the agent's current state (running, paused, stopped) and last poll timestamp |
-| `POST` | `/api/agent/start` | Start the polling loop with an optional strategy config body |
-| `POST` | `/api/agent/stop` | Stop the polling loop gracefully |
-| `GET` | `/api/agent/trades` | List all executed trades with pagination |
-| `GET` | `/api/agent/trades/:id` | Get details for a specific trade |
-| `GET` | `/api/agent/positions` | List current open Polymarket positions |
-| `GET` | `/api/agent/markets` | List NBA markets the agent is tracking |
-| `POST` | `/api/agent/strategy` | Update the agent's strategy configuration |
-| `GET` | `/api/agent/strategy` | Get the current strategy configuration |
-| `GET` | `/api/agent/performance` | Aggregate P&L and win-rate statistics |
+| `POST` | `/api/agent/start` | Start the agent polling loop |
+| `POST` | `/api/agent/stop` | Stop the agent polling loop |
+| `GET` | `/api/agent/status` | Agent state, cycle count, recent cycle logs |
+| `GET` | `/api/markets` | Discover active NBA markets with prices |
+| `GET` | `/api/trades` | Paginated trade history with reasoning |
+| `GET` | `/api/positions` | Current open positions (DB records merged with live CLI data) |
+| `GET` | `/api/strategy` | Get current strategy config |
+| `PUT` | `/api/strategy` | Update strategy config |
+| `POST` | `/api/onboarding/validate` | Validate API keys from orchestrator key |
+| `POST` | `/api/onboarding/configure` | Apply orchestrator key or manual configuration |
 
-## Starting and Stopping the Agent
-
-### Start
+## Setup
 
 ```bash
-# 1. Install dependencies and set up the database
-npm run setup
-
-# 2. Copy and fill in environment variables
+npm install
+npx prisma generate
+npx prisma db push
 cp .env.example .env
 # Edit .env with your keys
-
-# 3. Start the development server (includes the agent)
 npm run dev
 ```
 
-Then call the start endpoint:
-```bash
-curl -X POST http://localhost:3000/api/agent/start \
-  -H "Content-Type: application/json" \
-  -d '{"riskTolerance": "moderate", "focusTeams": ["LAL", "BOS"]}'
-```
+After the dev server is running, use the onboarding UI or call the API directly to configure the agent and start trading.
 
-### Stop
+## Important Notes
 
-```bash
-curl -X POST http://localhost:3000/api/agent/stop
-```
+**Polymarket runs on Polygon PoS.** The configured wallet needs USDC.e (bridged USDC, contract `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`) for trading collateral and POL for gas fees.
 
-Or simply kill the dev server process. The agent persists its state to the database, so it will resume cleanly on next startup.
+**Use EOA signature mode.** Proxy mode requires additional contract deployment. The agent expects direct EOA signing.
 
-## Example Orchestrator Key
+**Approve exchange contracts before trading.** Run `polymarket approve set` to submit the 6 required approval transactions. Check status with `polymarket approve check`.
 
-```json
-{
-  "version": 1,
-  "wallet": "0x1234567890abcdef1234567890abcdef12345678",
-  "scope": ["nba"],
-  "maxPositionUsd": 100,
-  "maxDailyVolumeUsd": 500,
-  "expiresAt": "2026-12-31T23:59:59Z",
-  "signature": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"
-}
-```
+**Sync CLOB balance after funding.** After bridging USDC.e to the wallet, run `polymarket clob update-balance --asset-type collateral` to make the balance visible to the CLOB.
+
+**BallDontLie free tier limitations.** The free tier only supports `/games`, `/teams`, and `/players` endpoints. Standings, advanced stats, and injury data require a paid tier. The agent degrades gracefully when these are unavailable.
+
+**Twitter/X API requirements.** The bearer token must have v2 search access. The agent degrades gracefully if no token is configured or if the API is unreachable.
+
+**Long-running process required.** The agent loop runs in-process with `setInterval`. It requires a persistent Node.js process and is not compatible with serverless deployments.

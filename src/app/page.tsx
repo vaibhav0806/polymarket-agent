@@ -38,12 +38,12 @@ interface AgentStatus {
 }
 
 interface Market {
-  conditionId: string;
+  id: string;
   question: string;
-  outcomes: string[];
-  outcomePrices: string[];
+  outcomes: { title: string; tokenId: string; price: number | null }[];
+  type: string;
   volume: number;
-  endDate: string;
+  closed: boolean;
 }
 
 interface Position {
@@ -340,7 +340,7 @@ export default function Dashboard() {
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {markets.slice(0, 15).map((m) => (
                 <div
-                  key={m.conditionId}
+                  key={m.id}
                   className="flex items-start justify-between py-2 border-b border-gray-800/50 last:border-0"
                 >
                   <p className="text-sm text-gray-300 pr-4 flex-1 leading-snug">
@@ -349,16 +349,16 @@ export default function Dashboard() {
                   <div className="flex gap-2 shrink-0">
                     {m.outcomes?.map((outcome, i) => (
                       <span
-                        key={outcome}
+                        key={outcome.tokenId || i}
                         className={`text-xs px-2 py-0.5 rounded font-mono ${
                           i === 0
                             ? "bg-emerald-900/30 text-emerald-400"
                             : "bg-red-900/30 text-red-400"
                         }`}
                       >
-                        {outcome}{" "}
-                        {m.outcomePrices?.[i]
-                          ? `${(parseFloat(m.outcomePrices[i]) * 100).toFixed(0)}c`
+                        {outcome.title}{" "}
+                        {outcome.price !== null
+                          ? `${(outcome.price * 100).toFixed(0)}c`
                           : "--"}
                       </span>
                     ))}

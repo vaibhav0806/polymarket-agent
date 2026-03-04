@@ -78,7 +78,7 @@ For one-step setup, create an orchestrator key — a base64url-encoded JSON obje
   "defaultStrategy": {
     "focusTeams": ["LAL", "BOS"],
     "riskTolerance": "moderate",
-    "customRules": "Only trade game_winner markets when a star player is listed as OUT"
+    "customRules": "Only trade moneyline markets when a star player is listed as OUT"
   }
 }
 ```
@@ -110,7 +110,7 @@ The strategy is fully customizable via the web UI at `/strategy`:
 | **Min Confidence** | LLM confidence threshold (0–1) | 0.6 |
 | **Max Daily Trades** | Hard cap on trades per day | 10 |
 | **Max Daily Loss** | Circuit breaker — stops trading if exceeded | $50 |
-| **Market Types** | `game_winner`, `spread`, `player_prop`, `futures` | All |
+| **Market Types** | `moneyline`, `spreads`, `totals`, `player_prop`, `futures` | All |
 | **Order Type** | `market` or `limit` | `market` |
 | **LLM Model** | OpenAI model to use | `gpt-4o-mini` |
 | **Poll Interval** | How often the agent runs a cycle | 5 min |

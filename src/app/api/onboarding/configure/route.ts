@@ -14,7 +14,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { orchestratorKey, openaiApiKey, polymarketPrivateKey, strategy } = body;
+    const { orchestratorKey, strategy } = body;
+    // Accept both long names (from orchestrator decode) and short names (from UI manual entry)
+    const openaiApiKey = body.openaiApiKey || body.openaiKey;
+    const polymarketPrivateKey = body.polymarketPrivateKey || body.polymarketKey;
 
     if (orchestratorKey) {
       try {
@@ -47,6 +50,16 @@ export async function POST(request: NextRequest) {
           const msg = e instanceof Error ? e.message : "Failed to set Polymarket key";
           steps.push({ name: "set_polymarket_key", status: "error", message: msg });
         }
+      }
+
+      // Store optional keys from manual entry
+      const twitterToken = body.twitterBearerToken || body.twitterToken;
+      const balldontlieKey = body.balldontlieApiKey || body.ballDontLieKey;
+      if (twitterToken) {
+        await setConfig("twitterBearerToken", twitterToken).catch(() => {});
+      }
+      if (balldontlieKey) {
+        await setConfig("balldontlieApiKey", balldontlieKey).catch(() => {});
       }
 
       try {
