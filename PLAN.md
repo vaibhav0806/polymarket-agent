@@ -31,7 +31,7 @@
 
 ### OpenClaw Skill Integration
 - [x] `SKILL.md` rewritten in correct OpenClaw format (YAML frontmatter + runbook body)
-- [x] CLI scripts in `skills/nba-trader/scripts/`:
+- [x] CLI scripts in `skills/nba-polymarket-trader/scripts/`:
   - `wallet.ts` — wallet address + approval status
   - `setup.ts` — first-time setup (DB + wallet + approvals)
   - `discover.ts` — search NBA markets with team/type filters

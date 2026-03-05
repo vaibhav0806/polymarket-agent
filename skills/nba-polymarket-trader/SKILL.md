@@ -2,18 +2,7 @@
 name: nba-polymarket-trader
 description: "Autonomous NBA prediction market trading agent for Polymarket. Use when: (1) user wants to discover and trade NBA prediction markets, (2) user wants automated NBA sports betting analysis, (3) user wants to run an NBA trading strategy. NOT for: non-NBA markets, manual crypto trading, general Polymarket browsing."
 version: "1.0.0"
-metadata:
-  openclaw:
-    emoji: "🏀"
-    homepage: "https://polymarket.com"
-    primaryEnv: POLYMARKET_PRIVATE_KEY
-    requires:
-      bins: [polymarket, node]
-      env: [OPENAI_API_KEY, POLYMARKET_PRIVATE_KEY]
-    install:
-      - kind: node
-        package: tsx
-        bins: [tsx]
+metadata: {"openclaw": {"emoji": "🏀", "homepage": "https://polymarket.com", "primaryEnv": "POLYMARKET_PRIVATE_KEY", "requires": {"bins": ["polymarket", "node"], "env": ["OPENAI_API_KEY", "POLYMARKET_PRIVATE_KEY"]}, "install": [{"kind": "node", "package": "tsx", "bins": ["tsx"]}]}}
 ---
 
 # NBA Polymarket Trader
@@ -21,13 +10,24 @@ metadata:
 Trade NBA prediction markets on Polymarket using real-time sports data,
 LLM analysis, and automated risk management.
 
-All commands run from the project root (the directory containing `package.json`).
+**IMPORTANT:** All commands MUST be run from the project root. Always `cd` first:
+
+```bash
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent
+```
+
+## Rules
+
+- Always `cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent` before running any script.
+- All scripts output JSON to stdout. Parse stdout for data.
+- Never run `run-cycle.ts` without `--dry-run` unless the user explicitly asks to execute real trades.
+- If a script fails, check the Troubleshooting section before retrying.
 
 ## Quick Start
 
 ```bash
-npm install
-npx tsx skills/nba-trader/scripts/setup.ts
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npm install
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/setup.ts
 ```
 
 This installs dependencies, initializes the database, checks your wallet,
@@ -38,14 +38,14 @@ and sets contract approvals if needed.
 Search for active NBA prediction markets on Polymarket.
 
 ```bash
-npx tsx skills/nba-trader/scripts/discover.ts
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/discover.ts
 ```
 
 Filter by team or market type:
 
 ```bash
-npx tsx skills/nba-trader/scripts/discover.ts --teams "LAL,BOS"
-npx tsx skills/nba-trader/scripts/discover.ts --types "moneyline,spreads"
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/discover.ts --teams "LAL,BOS"
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/discover.ts --types "moneyline,spreads"
 ```
 
 Returns JSON:
@@ -73,8 +73,8 @@ Returns JSON:
 Fetch real-time NBA data from BallDontLie API and Twitter/X.
 
 ```bash
-npx tsx skills/nba-trader/scripts/signals.ts
-npx tsx skills/nba-trader/scripts/signals.ts --teams "LAL,BOS"
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/signals.ts
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/signals.ts --teams "LAL,BOS"
 ```
 
 Returns JSON with sections: `games`, `standings`, `injuries`, `tweets`.
@@ -85,8 +85,8 @@ Run the full pipeline — discover markets, collect signals, LLM analysis,
 risk filtering — without executing any trades.
 
 ```bash
-npx tsx skills/nba-trader/scripts/analyze.ts
-npx tsx skills/nba-trader/scripts/analyze.ts --teams "LAL" --risk conservative --min-confidence 0.7
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/analyze.ts
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/analyze.ts --teams "LAL" --risk conservative --min-confidence 0.7
 ```
 
 Returns JSON:
@@ -120,19 +120,19 @@ Returns JSON:
 **WARNING: This executes real trades with real money (USDC.e on Polygon).**
 
 ```bash
-npx tsx skills/nba-trader/scripts/run-cycle.ts
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/run-cycle.ts
 ```
 
 Dry-run mode (same as analyze but through the cycle pipeline):
 
 ```bash
-npx tsx skills/nba-trader/scripts/run-cycle.ts --dry-run
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/run-cycle.ts --dry-run
 ```
 
 With strategy overrides:
 
 ```bash
-npx tsx skills/nba-trader/scripts/run-cycle.ts --teams "LAL" --max-position 5 --risk conservative
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/run-cycle.ts --teams "LAL" --max-position 5 --risk conservative
 ```
 
 ## Check Positions
@@ -141,7 +141,7 @@ View open positions from the database merged with live on-chain data.
 Requires database to be initialized (run setup first).
 
 ```bash
-npx tsx skills/nba-trader/scripts/positions.ts
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/positions.ts
 ```
 
 ## Check Wallet
@@ -149,7 +149,7 @@ npx tsx skills/nba-trader/scripts/positions.ts
 View wallet address and contract approval status.
 
 ```bash
-npx tsx skills/nba-trader/scripts/wallet.ts
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/wallet.ts
 ```
 
 ## Strategy Customization
@@ -170,12 +170,7 @@ All strategy flags can be passed to `analyze.ts`, `run-cycle.ts`, and `discover.
 Example with multiple overrides:
 
 ```bash
-npx tsx skills/nba-trader/scripts/analyze.ts \
-  --teams "LAL,BOS" \
-  --risk aggressive \
-  --min-confidence 0.8 \
-  --max-position 25 \
-  --model "gpt-4o"
+cd /Users/vaibhav/Documents/projects/bento/polymarket-nba-agent && npx tsx skills/nba-polymarket-trader/scripts/analyze.ts --teams "LAL,BOS" --risk aggressive --min-confidence 0.8 --max-position 25 --model "gpt-4o"
 ```
 
 ## Environment Variables

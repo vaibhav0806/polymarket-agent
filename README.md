@@ -86,34 +86,34 @@ Open [http://localhost:3000](http://localhost:3000) to use the dashboard.
 
 ## OpenClaw Skill
 
-This project is also available as an OpenClaw skill. Any OpenClaw agent can use the CLI scripts in `skills/nba-trader/scripts/` to autonomously trade NBA markets.
+This project is also available as an OpenClaw skill. Any OpenClaw agent can use the CLI scripts in `skills/nba-polymarket-trader/scripts/` to autonomously trade NBA markets.
 
 ### Skill Commands
 
 ```bash
 # Check wallet and approvals
-npx tsx skills/nba-trader/scripts/wallet.ts
+npx tsx skills/nba-polymarket-trader/scripts/wallet.ts
 
 # First-time setup (DB + wallet + approvals)
-npx tsx skills/nba-trader/scripts/setup.ts
+npx tsx skills/nba-polymarket-trader/scripts/setup.ts
 
 # Discover NBA markets
-npx tsx skills/nba-trader/scripts/discover.ts --teams "LAL,BOS"
+npx tsx skills/nba-polymarket-trader/scripts/discover.ts --teams "LAL,BOS"
 
 # Fetch NBA signals (games, injuries, tweets)
-npx tsx skills/nba-trader/scripts/signals.ts --teams "LAL"
+npx tsx skills/nba-polymarket-trader/scripts/signals.ts --teams "LAL"
 
 # Analyze markets (dry run — no trades)
-npx tsx skills/nba-trader/scripts/analyze.ts --risk conservative --min-confidence 0.7
+npx tsx skills/nba-polymarket-trader/scripts/analyze.ts --risk conservative --min-confidence 0.7
 
 # Run full trading cycle
-npx tsx skills/nba-trader/scripts/run-cycle.ts --teams "LAL" --max-position 5
+npx tsx skills/nba-polymarket-trader/scripts/run-cycle.ts --teams "LAL" --max-position 5
 
 # Check open positions
-npx tsx skills/nba-trader/scripts/positions.ts
+npx tsx skills/nba-polymarket-trader/scripts/positions.ts
 ```
 
-All scripts output structured JSON to stdout. See `skills/nba-trader/SKILL.md` for full documentation.
+All scripts output structured JSON to stdout. See `skills/nba-polymarket-trader/SKILL.md` for full documentation.
 
 ### Strategy Flags
 
@@ -224,7 +224,7 @@ src/
 │   ├── ui.tsx                      # Shared UI components
 │   └── agent-status-context.tsx    # Agent status React context
 └── generated/prisma/               # Generated Prisma client
-skills/nba-trader/
+skills/nba-polymarket-trader/
 ├── SKILL.md                        # OpenClaw skill definition
 └── scripts/                        # CLI scripts for OpenClaw agents
     ├── _utils.ts                   # Shared helpers (flags, strategy builder)
