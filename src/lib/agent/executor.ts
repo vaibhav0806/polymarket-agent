@@ -72,26 +72,26 @@ export async function executeTrades(
     try {
       let orderResult;
 
-      if (strategy.orderType === "limit") {
-        // For limit orders, fetch the current midpoint as the price
-        const midResult = await getMidpoint(tokenId);
-        const price =
-          midResult.ok && midResult.data
-            ? parseFloat(midResult.data.midpoint)
-            : 0.5;
+      // Fetch midpoint as the price for both order types
+      const midResult = await getMidpoint(tokenId);
+      const price =
+        midResult.ok && midResult.data
+          ? parseFloat(midResult.data.midpoint)
+          : 0.5;
 
+      // Update trade with the price before execution
+      await prisma.trade.update({
+        where: { id: trade.id },
+        data: { price },
+      });
+
+      if (strategy.orderType === "limit") {
         orderResult = await createLimitOrder(
           tokenId,
           rec.action,
           rec.amount,
           price
         );
-
-        // Update trade with the actual price
-        await prisma.trade.update({
-          where: { id: trade.id },
-          data: { price },
-        });
       } else {
         orderResult = await createMarketOrder(tokenId, rec.action, rec.amount);
       }

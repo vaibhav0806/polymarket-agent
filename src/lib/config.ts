@@ -17,7 +17,7 @@ export interface StrategyConfig {
   active: boolean;
 }
 
-const STRATEGY_DEFAULTS: Omit<StrategyConfig, "id"> = {
+export const STRATEGY_DEFAULTS: Omit<StrategyConfig, "id"> = {
   focusTeams: [],
   marketTypes: ["moneyline", "spreads", "totals", "player_prop", "futures"],
   riskTolerance: "moderate",

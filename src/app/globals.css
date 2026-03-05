@@ -3,11 +3,19 @@
 :root {
   --background: #030712;
   --foreground: #ededed;
+  --surface: #0a0f1a;
+  --surface-hover: #0f1629;
+  --border: #1e293b;
+  --border-subtle: #151d2e;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -15,7 +23,60 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Gradient backgrounds */
+@utility bg-gradient-emerald {
+  background: linear-gradient(135deg, #059669, #10b981);
+}
+@utility bg-gradient-blue {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+}
+@utility bg-gradient-purple {
+  background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+}
+@utility bg-gradient-red {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+}
+@utility bg-gradient-amber {
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+}
+
+/* Card glow effects */
+@utility card-glow {
+  box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+@utility card-glow-hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 100%, white 10%), 0 2px 8px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Skeleton shimmer animation */
+@utility skeleton {
+  background: linear-gradient(90deg, #0f172a 25%, #1e293b 50%, #0f172a 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.5rem;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Gradient text */
+@utility text-gradient-emerald {
+  background: linear-gradient(135deg, #059669, #34d399);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Button press effect */
+@utility btn-press {
+  transition: transform 0.1s, filter 0.15s;
+  &:hover { filter: brightness(1.1); }
+  &:active { transform: scale(0.98); }
 }
 
 /* Custom scrollbar for dark theme */
@@ -25,14 +86,14 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #111827;
+  background: #0a0f1a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #374151;
+  background: #1e293b;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4b5563;
+  background: #334155;
 }

@@ -54,5 +54,8 @@ prisma/dev.db-journal
 .env
 .env.local
 
+# Interview source
+source.txt
+
 # Generated
 src/generated/

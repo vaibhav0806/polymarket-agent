@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Save,
   Loader2,
@@ -8,21 +8,27 @@ import {
   AlertCircle,
   Settings,
   X,
+  Shield,
+  Flame,
+  Scale,
+  ChevronDown,
+  ChevronUp,
+  DollarSign,
+  Target,
+  BarChart3,
+  Gauge,
 } from "lucide-react";
 
-const NBA_TEAMS = [
-  "ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
-  "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
-  "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS",
-];
-
-const MARKET_TYPES = [
-  { value: "moneyline", label: "Moneyline" },
-  { value: "spreads", label: "Spreads" },
-  { value: "totals", label: "Totals" },
-  { value: "player_prop", label: "Player Props" },
-  { value: "futures", label: "Futures" },
-];
+import { NBA_TEAMS, MARKET_TYPES } from "@/lib/constants";
+import {
+  Card,
+  StatCard,
+  PageHeader,
+  SectionHeader,
+  NumberInput,
+  SkeletonCard,
+  EmptyState,
+} from "@/components/ui";
 
 interface Strategy {
   focusTeams: string[];
@@ -54,6 +60,12 @@ const defaultStrategy: Strategy = {
   customRules: "",
 };
 
+const riskConfig = {
+  conservative: { icon: Shield, color: "blue", label: "Conservative" },
+  moderate: { icon: Scale, color: "amber", label: "Moderate" },
+  aggressive: { icon: Flame, color: "red", label: "Aggressive" },
+} as const;
+
 export default function StrategyPage() {
   const [strategy, setStrategy] = useState<Strategy>(defaultStrategy);
   const [loading, setLoading] = useState(true);
@@ -62,10 +74,15 @@ export default function StrategyPage() {
     "idle" | "success" | "error"
   >("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/strategy")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load strategy");
+        return r.json();
+      })
       .then((data) => {
         if (data && !data.error) {
           setStrategy({
@@ -80,7 +97,9 @@ export default function StrategyPage() {
           });
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        setLoadError(err instanceof Error ? err.message : "Failed to load strategy");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -132,52 +151,123 @@ export default function StrategyPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 size={24} className="animate-spin text-gray-500" />
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="skeleton h-8 w-56" />
+          <div className="skeleton h-10 w-24 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <SkeletonCard className="h-48" />
+          <SkeletonCard className="h-48" />
+        </div>
+        <SkeletonCard className="h-64" />
       </div>
     );
   }
 
+  const riskLabel = (riskConfig[strategy.riskTolerance as keyof typeof riskConfig] ?? riskConfig.moderate).label;
+
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-2">
-          <Settings size={18} className="text-purple-400" />
-          <h1 className="text-xl font-semibold text-white">
-            Strategy Configuration
-          </h1>
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title="Strategy"
+        action={
+          <button
+            onClick={save}
+            disabled={saving}
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-all btn-press ${
+              saveStatus === "success"
+                ? "bg-gradient-emerald text-white shadow-lg shadow-emerald-500/20"
+                : saveStatus === "error"
+                  ? "bg-gradient-red text-white shadow-lg shadow-red-500/20"
+                  : "bg-gradient-blue text-white shadow-lg shadow-blue-500/20"
+            } disabled:opacity-50`}
+          >
+            {saving ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : saveStatus === "success" ? (
+              <CheckCircle2 size={14} />
+            ) : saveStatus === "error" ? (
+              <AlertCircle size={14} />
+            ) : (
+              <Save size={14} />
+            )}
+            {saving ? "Saving..." : saveStatus === "success" ? "Saved!" : "Save"}
+          </button>
+        }
+      />
+
+      {loadError && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+          <p className="text-sm text-yellow-400">
+            Could not load saved strategy: {loadError}. Showing defaults.
+          </p>
         </div>
-        <button
-          onClick={save}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 transition-colors"
-        >
-          {saving ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : saveStatus === "success" ? (
-            <CheckCircle2 size={14} className="text-emerald-400" />
-          ) : saveStatus === "error" ? (
-            <AlertCircle size={14} className="text-red-400" />
-          ) : (
-            <Save size={14} />
-          )}
-          {saving ? "Saving..." : saveStatus === "success" ? "Saved" : "Save"}
-        </button>
-      </div>
+      )}
 
       {saveStatus === "error" && (
-        <div className="bg-red-900/20 border border-red-900/50 rounded-lg p-3 mb-6">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
           <p className="text-sm text-red-400">{errorMsg}</p>
         </div>
       )}
 
-      <div className="space-y-6">
-        {/* Custom Rules - prominent placement */}
-        <Card>
-          <h2 className="text-sm font-medium text-white mb-1">
-            Custom Trading Rules
-          </h2>
-          <p className="text-xs text-gray-500 mb-3">
+      {/* Stats row - mirrors dashboard pattern */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Risk Level"
+          value={riskLabel}
+          icon={<Gauge size={18} />}
+          accent={
+            strategy.riskTolerance === "conservative"
+              ? "text-blue-400"
+              : strategy.riskTolerance === "aggressive"
+                ? "text-red-400"
+                : "text-amber-400"
+          }
+          gradient={
+            strategy.riskTolerance === "conservative"
+              ? "blue"
+              : strategy.riskTolerance === "aggressive"
+                ? "red"
+                : "amber"
+          }
+          sub={`${strategy.focusTeams.length || "All"} team${strategy.focusTeams.length !== 1 ? "s" : ""} tracked`}
+        />
+        <StatCard
+          label="Max Position"
+          value={`$${strategy.maxPositionSize}`}
+          icon={<DollarSign size={18} />}
+          accent="text-blue-400"
+          gradient="blue"
+          sub={`${strategy.orderType} orders`}
+        />
+        <StatCard
+          label="Max Exposure"
+          value={`$${strategy.maxTotalExposure}`}
+          icon={<Target size={18} />}
+          accent="text-purple-400"
+          gradient="purple"
+          sub={`$${strategy.maxDailyLoss} daily loss limit`}
+        />
+        <StatCard
+          label="Min Confidence"
+          value={`${(strategy.minConfidence * 100).toFixed(0)}%`}
+          icon={<BarChart3 size={18} />}
+          accent="text-emerald-400"
+          gradient="emerald"
+          sub={`${strategy.maxDailyTrades} trades/day max`}
+        />
+      </div>
+
+      {/* Main config grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Custom Rules */}
+        <Card className="lg:col-span-2">
+          <SectionHeader>Custom Trading Rules</SectionHeader>
+          <p className="text-xs text-gray-500 mb-3 -mt-2">
             Define rules in plain English. The AI agent will follow these when
             making trading decisions.
           </p>
@@ -185,15 +275,15 @@ export default function StrategyPage() {
             value={strategy.customRules}
             onChange={(e) => update("customRules", e.target.value)}
             placeholder="e.g., Only trade when a star player is injured. Avoid games with less than 2 hours until tip-off. Never bet against the Celtics at home."
-            rows={5}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 resize-none"
+            rows={4}
+            className="w-full bg-[#060b16] border border-[#1e293b] rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 resize-none transition-all"
           />
         </Card>
 
         {/* Focus Teams */}
-        <Card>
-          <h2 className="text-sm font-medium text-white mb-1">Focus Teams</h2>
-          <p className="text-xs text-gray-500 mb-3">
+        <Card className="lg:col-span-2">
+          <SectionHeader>Focus Teams</SectionHeader>
+          <p className="text-xs text-gray-500 mb-3 -mt-2">
             Select teams to focus on. Leave empty to trade all NBA markets.
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -201,10 +291,10 @@ export default function StrategyPage() {
               <button
                 key={team}
                 onClick={() => toggleTeam(team)}
-                className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
+                className={`px-3 py-1.5 text-xs rounded-full border font-medium transition-all btn-press ${
                   strategy.focusTeams.includes(team)
-                    ? "bg-blue-600/20 border-blue-600 text-blue-400"
-                    : "bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600"
+                    ? "bg-gradient-blue border-blue-500/30 text-white shadow-sm shadow-blue-500/10"
+                    : "bg-[#060b16] border-[#1e293b] text-gray-500 hover:text-gray-300 hover:border-gray-500"
                 }`}
               >
                 {team}
@@ -212,25 +302,25 @@ export default function StrategyPage() {
             ))}
           </div>
           {strategy.focusTeams.length > 0 && (
-            <div className="flex items-center gap-1 mt-2">
+            <div className="flex items-center gap-1 mt-3">
               <span className="text-xs text-gray-500">
                 Selected: {strategy.focusTeams.join(", ")}
               </span>
               <button
                 onClick={() => update("focusTeams", [])}
-                className="text-gray-600 hover:text-gray-400"
+                className="text-gray-600 hover:text-gray-400 transition-colors"
               >
                 <X size={12} />
               </button>
             </div>
           )}
         </Card>
+      </div>
 
-        {/* Risk & Sizing */}
-        <Card>
-          <h2 className="text-sm font-medium text-white mb-4">
-            Risk & Position Sizing
-          </h2>
+      {/* Risk & Sizing + Market Types row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2">
+          <SectionHeader>Risk & Position Sizing</SectionHeader>
 
           {/* Risk Tolerance */}
           <div className="mb-5">
@@ -239,23 +329,30 @@ export default function StrategyPage() {
             </label>
             <div className="flex gap-2">
               {(["conservative", "moderate", "aggressive"] as const).map(
-                (level) => (
-                  <button
-                    key={level}
-                    onClick={() => update("riskTolerance", level)}
-                    className={`flex-1 px-3 py-2 text-xs rounded-lg border capitalize transition-colors ${
-                      strategy.riskTolerance === level
-                        ? level === "conservative"
-                          ? "bg-blue-600/20 border-blue-600 text-blue-400"
-                          : level === "moderate"
-                            ? "bg-yellow-600/20 border-yellow-600 text-yellow-400"
-                            : "bg-red-600/20 border-red-600 text-red-400"
-                        : "bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300"
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ),
+                (level) => {
+                  const cfg = riskConfig[level];
+                  const Icon = cfg.icon;
+                  const active = strategy.riskTolerance === level;
+                  const colorMap = {
+                    blue: active ? "bg-gradient-blue border-blue-500/30 text-white shadow-sm shadow-blue-500/10" : "",
+                    amber: active ? "bg-gradient-amber border-amber-500/30 text-white shadow-sm shadow-amber-500/10" : "",
+                    red: active ? "bg-gradient-red border-red-500/30 text-white shadow-sm shadow-red-500/10" : "",
+                  };
+                  return (
+                    <button
+                      key={level}
+                      onClick={() => update("riskTolerance", level)}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-3 text-xs rounded-xl border font-medium capitalize transition-all btn-press ${
+                        active
+                          ? colorMap[cfg.color]
+                          : "bg-[#060b16] border-[#1e293b] text-gray-500 hover:text-gray-300"
+                      }`}
+                    >
+                      <Icon size={14} />
+                      {cfg.label}
+                    </button>
+                  );
+                },
               )}
             </div>
           </div>
@@ -289,7 +386,7 @@ export default function StrategyPage() {
             <NumberInput
               label="Max Daily Trades"
               value={strategy.maxDailyTrades}
-              onChange={(v) => update("maxDailyTrades", v)}
+              onChange={(v) => update("maxDailyTrades", Math.round(v))}
               min={1}
               max={100}
             />
@@ -310,7 +407,7 @@ export default function StrategyPage() {
               <select
                 value={strategy.orderType}
                 onChange={(e) => update("orderType", e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-[#060b16] border border-[#1e293b] rounded-xl px-3 py-2.5 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
               >
                 <option value="market">Market</option>
                 <option value="limit">Limit</option>
@@ -320,30 +417,55 @@ export default function StrategyPage() {
         </Card>
 
         {/* Market Types */}
-        <Card>
-          <h2 className="text-sm font-medium text-white mb-3">Market Types</h2>
-          <div className="flex flex-wrap gap-3">
-            {MARKET_TYPES.map(({ value, label }) => (
-              <label
-                key={value}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={strategy.marketTypes.includes(value)}
-                  onChange={() => toggleMarketType(value)}
-                  className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                />
-                <span className="text-sm text-gray-300">{label}</span>
-              </label>
-            ))}
+        <Card className="lg:col-span-1">
+          <SectionHeader>Market Types</SectionHeader>
+          <div className="space-y-2">
+            {MARKET_TYPES.map(({ value, label }) => {
+              const checked = strategy.marketTypes.includes(value);
+              return (
+                <button
+                  key={value}
+                  onClick={() => toggleMarketType(value)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm rounded-xl border font-medium transition-all btn-press text-left ${
+                    checked
+                      ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                      : "bg-[#060b16] border-[#1e293b] text-gray-500 hover:text-gray-300 hover:border-gray-500"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      checked ? "border-blue-400 bg-blue-500" : "border-gray-600"
+                    }`}
+                  >
+                    {checked && (
+                      <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M2 6l3 3 5-5" />
+                      </svg>
+                    )}
+                  </div>
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </Card>
+      </div>
 
-        {/* Advanced */}
-        <Card>
-          <h2 className="text-sm font-medium text-white mb-4">Advanced</h2>
-          <div className="grid grid-cols-2 gap-4">
+      {/* Advanced (collapsible) */}
+      <Card>
+        <button
+          onClick={() => setAdvancedOpen(!advancedOpen)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <SectionHeader>Advanced</SectionHeader>
+          {advancedOpen ? (
+            <ChevronUp size={16} className="text-gray-500" />
+          ) : (
+            <ChevronDown size={16} className="text-gray-500" />
+          )}
+        </button>
+        {advancedOpen && (
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#1e293b]">
             <NumberInput
               label="Poll Interval (ms)"
               value={strategy.pollIntervalMs}
@@ -359,7 +481,7 @@ export default function StrategyPage() {
               <select
                 value={strategy.llmModel}
                 onChange={(e) => update("llmModel", e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-[#060b16] border border-[#1e293b] rounded-xl px-3 py-2.5 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
               >
                 <option value="gpt-4o-mini">GPT-4o Mini</option>
                 <option value="gpt-4o">GPT-4o</option>
@@ -367,55 +489,8 @@ export default function StrategyPage() {
               </select>
             </div>
           </div>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function Card({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`bg-gray-900 border border-gray-800 rounded-xl p-5 ${className}`}
-    >
-      {children}
-    </div>
-  );
-}
-
-function NumberInput({
-  label,
-  value,
-  onChange,
-  min,
-  max,
-  step = 1,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  min: number;
-  max: number;
-  step?: number;
-}) {
-  return (
-    <div>
-      <label className="block text-xs text-gray-400 mb-1.5">{label}</label>
-      <input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        min={min}
-        max={max}
-        step={step}
-        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
-      />
+        )}
+      </Card>
     </div>
   );
 }

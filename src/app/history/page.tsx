@@ -6,9 +6,24 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
-  Filter,
   RefreshCw,
+  FileText,
+  CheckCircle,
+  XCircle,
+  BarChart3,
+  Activity,
 } from "lucide-react";
+import {
+  Card,
+  StatCard,
+  StatusBadge,
+  PageHeader,
+  SectionHeader,
+  EmptyState,
+  SkeletonCard,
+  SkeletonRow,
+  timeAgo,
+} from "@/components/ui";
 
 interface Trade {
   id: number;
@@ -55,8 +70,9 @@ export default function HistoryPage() {
   const LIMIT = 20;
 
   const fetchTrades = useCallback(
-    async (reset = false) => {
+    async (reset = false, filter?: string) => {
       const currentOffset = reset ? 0 : offset;
+      const currentFilter = filter ?? statusFilter;
       if (reset) {
         setLoading(true);
       } else {
@@ -64,8 +80,9 @@ export default function HistoryPage() {
       }
 
       try {
+        const statusParam = currentFilter !== "all" ? `&status=${currentFilter}` : "";
         const res = await fetch(
-          `/api/trades?limit=${LIMIT}&offset=${currentOffset}`,
+          `/api/trades?limit=${LIMIT}&offset=${currentOffset}${statusParam}`,
         );
         const data = await res.json();
         if (data.trades) {
@@ -85,7 +102,7 @@ export default function HistoryPage() {
         setLoadingMore(false);
       }
     },
-    [offset],
+    [offset, statusFilter],
   );
 
   const fetchCycles = useCallback(async () => {
@@ -108,80 +125,136 @@ export default function HistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredTrades =
-    statusFilter === "all"
-      ? trades
-      : trades.filter((t) => t.status === statusFilter);
+  const handleFilterChange = (filter: string) => {
+    setStatusFilter(filter);
+    fetchTrades(true, filter);
+  };
 
   const hasMore = trades.length < total;
 
+  // Compute stats
+  const filledCount = trades.filter((t) => t.status === "filled").length;
+  const failedCount = trades.filter((t) => t.status === "failed").length;
+  const totalVolume = trades.reduce((s, t) => s + t.amount, 0);
+  const avgConfidence = trades.length > 0
+    ? trades.reduce((s, t) => s + t.confidence, 0) / trades.length
+    : 0;
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 size={24} className="animate-spin text-gray-500" />
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="skeleton h-8 w-40" />
+          <div className="skeleton h-6 w-20" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+        <div className="flex gap-2">
+          {[...Array(5)].map((_, i) => <div key={i} className="skeleton h-8 w-20 rounded-full" />)}
+        </div>
+        <SkeletonCard className="h-64" />
+        <SkeletonCard className="h-48" />
       </div>
     );
   }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-white">Trade History</h1>
-        <button
-          onClick={() => fetchTrades(true)}
-          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          <RefreshCw size={12} />
-          Refresh
-        </button>
+      <PageHeader
+        title="Trade History"
+        action={
+          <button
+            onClick={() => { fetchTrades(true); fetchCycles(); }}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors btn-press"
+          >
+            <RefreshCw size={12} />
+            Refresh
+          </button>
+        }
+      />
+
+      {/* Stats row - mirrors dashboard pattern */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Total Trades"
+          value={String(total)}
+          icon={<BarChart3 size={18} />}
+          accent="text-blue-400"
+          gradient="blue"
+          sub={`${trades.length} loaded`}
+        />
+        <StatCard
+          label="Filled"
+          value={String(filledCount)}
+          icon={<CheckCircle size={18} />}
+          accent="text-emerald-400"
+          gradient="emerald"
+          sub={total > 0 ? `${((filledCount / trades.length) * 100).toFixed(0)}% success rate` : "No data"}
+        />
+        <StatCard
+          label="Volume"
+          value={`$${totalVolume.toFixed(2)}`}
+          icon={<Activity size={18} />}
+          accent="text-purple-400"
+          gradient="purple"
+          sub={`${failedCount} failed`}
+        />
+        <StatCard
+          label="Avg Confidence"
+          value={`${(avgConfidence * 100).toFixed(0)}%`}
+          icon={<XCircle size={18} />}
+          accent="text-amber-400"
+          gradient="amber"
+          sub={`${cycles.length} agent cycles`}
+        />
       </div>
 
-      {/* Filter */}
-      <div className="flex items-center gap-2">
-        <Filter size={14} className="text-gray-500" />
-        <div className="flex gap-1">
-          {STATUS_OPTIONS.map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1 text-xs rounded-md border capitalize transition-colors ${
-                statusFilter === s
-                  ? "bg-gray-800 border-gray-600 text-white"
-                  : "bg-transparent border-gray-800 text-gray-500 hover:text-gray-300 hover:border-gray-700"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+      {/* Filter - segmented control */}
+      <div className="inline-flex items-center bg-[#0a0f1a] border border-[#1e293b] rounded-xl p-1">
+        {STATUS_OPTIONS.map((s) => (
+          <button
+            key={s}
+            onClick={() => handleFilterChange(s)}
+            className={`px-4 py-1.5 text-xs rounded-lg font-medium capitalize transition-all ${
+              statusFilter === s
+                ? "bg-white/10 text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-300"
+            }`}
+          >
+            {s}
+          </button>
+        ))}
       </div>
 
       {/* Trades Table */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        {filteredTrades.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-600">
-            {trades.length === 0
-              ? "No trades recorded yet"
-              : "No trades match the selected filter"}
+      <Card className="!p-0 overflow-hidden">
+        {trades.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              icon={FileText}
+              title="No trades recorded"
+              description="Trades will appear here after the agent executes its first cycle"
+            />
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-500 border-b border-gray-800 bg-gray-900/80">
-                  <th className="px-4 py-3 font-medium">Time</th>
-                  <th className="px-4 py-3 font-medium">Market</th>
-                  <th className="px-4 py-3 font-medium">Side</th>
-                  <th className="px-4 py-3 font-medium">Action</th>
-                  <th className="px-4 py-3 font-medium">Amount</th>
-                  <th className="px-4 py-3 font-medium">Price</th>
-                  <th className="px-4 py-3 font-medium">Confidence</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium w-10"></th>
+                <tr className="text-left text-xs text-gray-500 uppercase tracking-wider border-b border-[#1e293b] bg-white/[0.02]">
+                  <th className="px-5 py-3.5 font-medium">Time</th>
+                  <th className="px-5 py-3.5 font-medium">Market</th>
+                  <th className="px-5 py-3.5 font-medium">Side</th>
+                  <th className="px-5 py-3.5 font-medium">Action</th>
+                  <th className="px-5 py-3.5 font-medium">Amount</th>
+                  <th className="px-5 py-3.5 font-medium">Price</th>
+                  <th className="px-5 py-3.5 font-medium">Confidence</th>
+                  <th className="px-5 py-3.5 font-medium">Status</th>
+                  <th className="px-5 py-3.5 font-medium w-10"></th>
                 </tr>
               </thead>
               <tbody>
-                {filteredTrades.map((t) => (
+                {trades.map((t, idx) => (
                   <TradeRow
                     key={t.id}
                     trade={t}
@@ -189,6 +262,7 @@ export default function HistoryPage() {
                     onToggle={() =>
                       setExpandedId(expandedId === t.id ? null : t.id)
                     }
+                    isOdd={idx % 2 === 1}
                   />
                 ))}
               </tbody>
@@ -197,11 +271,11 @@ export default function HistoryPage() {
         )}
 
         {hasMore && (
-          <div className="p-4 border-t border-gray-800 text-center">
+          <div className="p-4 border-t border-[#1e293b] text-center">
             <button
               onClick={() => fetchTrades(false)}
               disabled={loadingMore}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs text-gray-400 hover:text-white border border-gray-700 rounded-lg hover:border-gray-600 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-medium text-gray-400 hover:text-white border border-[#1e293b] rounded-xl hover:border-gray-500 transition-all btn-press disabled:opacity-50"
             >
               {loadingMore ? (
                 <Loader2 size={12} className="animate-spin" />
@@ -210,70 +284,65 @@ export default function HistoryPage() {
             </button>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Agent Cycles */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-        <h2 className="text-sm font-medium text-gray-400 mb-4">
-          Agent Cycle Log
-        </h2>
+      <Card>
+        <SectionHeader>Agent Cycle Log</SectionHeader>
+
         {cyclesLoading ? (
-          <div className="flex justify-center py-4">
-            <Loader2 size={16} className="animate-spin text-gray-600" />
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => <SkeletonRow key={i} />)}
           </div>
         ) : cycles.length === 0 ? (
-          <p className="text-sm text-gray-600">No cycles recorded</p>
+          <EmptyState
+            icon={Clock}
+            title="No cycles recorded"
+            description="Agent cycles will appear here after the agent runs"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-500 border-b border-gray-800">
-                  <th className="pb-2 pr-4 font-medium">Cycle</th>
-                  <th className="pb-2 pr-4 font-medium">Status</th>
-                  <th className="pb-2 pr-4 font-medium">Markets</th>
-                  <th className="pb-2 pr-4 font-medium">Signals</th>
-                  <th className="pb-2 pr-4 font-medium">Trades</th>
-                  <th className="pb-2 pr-4 font-medium">Duration</th>
-                  <th className="pb-2 font-medium">Time</th>
+                <tr className="text-left text-xs text-gray-500 uppercase tracking-wider border-b border-[#1e293b]">
+                  <th className="pb-3 pr-4 font-medium">Cycle</th>
+                  <th className="pb-3 pr-4 font-medium">Status</th>
+                  <th className="pb-3 pr-4 font-medium">Markets</th>
+                  <th className="pb-3 pr-4 font-medium">Signals</th>
+                  <th className="pb-3 pr-4 font-medium">Trades</th>
+                  <th className="pb-3 pr-4 font-medium">Duration</th>
+                  <th className="pb-3 font-medium">Time</th>
                 </tr>
               </thead>
               <tbody>
-                {cycles.map((c) => (
+                {cycles.map((c, idx) => (
                   <tr
                     key={c.id}
-                    className="border-b border-gray-800/50 last:border-0"
+                    className={`border-b border-[#1e293b]/50 last:border-0 hover:bg-white/[0.04] transition-colors ${
+                      idx % 2 === 1 ? "bg-white/[0.01]" : ""
+                    }`}
                   >
-                    <td className="py-2 pr-4 text-gray-400 font-mono">
+                    <td className="py-2.5 pr-4 text-gray-400 font-mono font-medium">
                       #{c.id}
                     </td>
-                    <td className="py-2 pr-4">
-                      <span
-                        className={`text-xs px-1.5 py-0.5 rounded ${
-                          c.status === "completed"
-                            ? "bg-emerald-900/30 text-emerald-400"
-                            : c.status === "error"
-                              ? "bg-red-900/30 text-red-400"
-                              : "bg-yellow-900/30 text-yellow-400"
-                        }`}
-                      >
-                        {c.status}
-                      </span>
+                    <td className="py-2.5 pr-4">
+                      <StatusBadge status={c.status} />
                     </td>
-                    <td className="py-2 pr-4 text-gray-400">
+                    <td className="py-2.5 pr-4 text-gray-400 font-mono">
                       {c.marketsFound}
                     </td>
-                    <td className="py-2 pr-4 text-gray-400">
+                    <td className="py-2.5 pr-4 text-gray-400 font-mono">
                       {c.signalsFetched}
                     </td>
-                    <td className="py-2 pr-4 text-gray-400">
+                    <td className="py-2.5 pr-4 text-gray-400 font-mono">
                       {c.tradesExecuted}
                     </td>
-                    <td className="py-2 pr-4 text-gray-500 font-mono text-xs">
+                    <td className="py-2.5 pr-4 text-gray-500 font-mono text-xs">
                       {c.durationMs
                         ? `${(c.durationMs / 1000).toFixed(1)}s`
                         : "--"}
                     </td>
-                    <td className="py-2 text-gray-500 text-xs">
+                    <td className="py-2.5 text-gray-500 text-xs">
                       {timeAgo(c.createdAt)}
                     </td>
                   </tr>
@@ -282,7 +351,7 @@ export default function HistoryPage() {
             </table>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
@@ -291,54 +360,58 @@ function TradeRow({
   trade,
   expanded,
   onToggle,
+  isOdd,
 }: {
   trade: Trade;
   expanded: boolean;
   onToggle: () => void;
+  isOdd: boolean;
 }) {
   return (
     <>
       <tr
-        className="border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer transition-colors"
+        className={`border-b border-[#1e293b]/50 hover:bg-white/[0.04] cursor-pointer transition-colors ${
+          isOdd ? "bg-white/[0.01]" : ""
+        }`}
         onClick={onToggle}
       >
-        <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">
+        <td className="px-5 py-3.5 text-gray-500 whitespace-nowrap text-xs">
           <Clock size={10} className="inline mr-1" />
           {timeAgo(trade.createdAt)}
         </td>
         <td
-          className="px-4 py-3 text-gray-300 max-w-[220px] truncate"
+          className="px-5 py-3.5 text-gray-300 max-w-[220px] truncate"
           title={trade.marketTitle}
         >
           {trade.marketTitle}
         </td>
-        <td className="px-4 py-3">
+        <td className="px-5 py-3.5">
           <span
-            className={`text-xs px-1.5 py-0.5 rounded ${
+            className={`text-xs px-2.5 py-1 rounded-lg font-medium ${
               trade.side === "YES"
-                ? "bg-emerald-900/30 text-emerald-400"
-                : "bg-red-900/30 text-red-400"
+                ? "bg-emerald-500/10 text-emerald-400"
+                : "bg-red-500/10 text-red-400"
             }`}
           >
             {trade.side}
           </span>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-5 py-3.5">
           <span
-            className={`text-xs ${trade.action === "BUY" ? "text-emerald-400" : "text-red-400"}`}
+            className={`text-xs font-medium ${trade.action === "BUY" ? "text-emerald-400" : "text-red-400"}`}
           >
             {trade.action}
           </span>
         </td>
-        <td className="px-4 py-3 font-mono text-gray-300">
+        <td className="px-5 py-3.5 font-mono text-gray-300 font-medium">
           ${trade.amount.toFixed(2)}
         </td>
-        <td className="px-4 py-3 font-mono text-gray-300">
-          {(trade.price * 100).toFixed(0)}c
+        <td className="px-5 py-3.5 font-mono text-gray-300">
+          {trade.price > 0 ? `${(trade.price * 100).toFixed(0)}c` : "--"}
         </td>
-        <td className="px-4 py-3">
+        <td className="px-5 py-3.5">
           <span
-            className={`font-mono text-xs ${
+            className={`font-mono font-medium text-xs ${
               trade.confidence >= 0.7
                 ? "text-emerald-400"
                 : trade.confidence >= 0.5
@@ -349,24 +422,26 @@ function TradeRow({
             {(trade.confidence * 100).toFixed(0)}%
           </span>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-5 py-3.5">
           <StatusBadge status={trade.status} />
         </td>
-        <td className="px-4 py-3 text-gray-600">
+        <td className="px-5 py-3.5 text-gray-600">
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </td>
       </tr>
       {expanded && (
-        <tr className="bg-gray-800/20">
-          <td colSpan={9} className="px-4 py-4">
-            <div className="space-y-2">
-              <div>
-                <span className="text-xs text-gray-500">Reasoning:</span>
-                <p className="text-sm text-gray-300 mt-1 leading-relaxed">
+        <tr className="bg-white/[0.02]">
+          <td colSpan={9} className="px-5 py-5">
+            <div className="space-y-3 pl-2 border-l-2 border-blue-500/30">
+              <div className="ml-4">
+                <span className="text-xs text-gray-500 uppercase tracking-wider">
+                  Reasoning
+                </span>
+                <p className="text-sm text-gray-300 mt-1.5 leading-relaxed">
                   {trade.reasoning}
                 </p>
               </div>
-              <div className="flex gap-6 text-xs text-gray-500">
+              <div className="flex gap-6 text-xs text-gray-500 ml-4 pt-2">
                 {trade.txHash && (
                   <span>
                     TX: <span className="font-mono text-gray-400">{trade.txHash}</span>
@@ -388,31 +463,4 @@ function TradeRow({
       )}
     </>
   );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    filled: "bg-emerald-900/30 text-emerald-400",
-    pending: "bg-yellow-900/30 text-yellow-400",
-    failed: "bg-red-900/30 text-red-400",
-    cancelled: "bg-gray-800 text-gray-500",
-  };
-  return (
-    <span
-      className={`text-xs px-1.5 py-0.5 rounded ${styles[status] ?? styles.pending}`}
-    >
-      {status}
-    </span>
-  );
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
 }

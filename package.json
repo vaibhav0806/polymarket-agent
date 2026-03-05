@@ -10,7 +10,14 @@
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
     "db:studio": "npx prisma studio",
-    "setup": "npm install && npx prisma generate && npx prisma migrate dev"
+    "setup": "npm install && npx prisma generate && npx prisma migrate dev",
+    "skill:setup": "tsx skills/nba-trader/scripts/setup.ts",
+    "skill:discover": "tsx skills/nba-trader/scripts/discover.ts",
+    "skill:signals": "tsx skills/nba-trader/scripts/signals.ts",
+    "skill:analyze": "tsx skills/nba-trader/scripts/analyze.ts",
+    "skill:cycle": "tsx skills/nba-trader/scripts/run-cycle.ts",
+    "skill:positions": "tsx skills/nba-trader/scripts/positions.ts",
+    "skill:wallet": "tsx skills/nba-trader/scripts/wallet.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.4.2",
@@ -33,6 +40,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.3.1",
+    "tsx": "^4.19.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",

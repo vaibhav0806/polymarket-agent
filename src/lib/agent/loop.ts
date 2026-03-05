@@ -215,18 +215,32 @@ export async function startAgent(): Promise<void> {
 
   const strategy = await getStrategy();
   running = true;
+  let currentInterval = strategy.pollIntervalMs;
 
   console.log(
-    `[agent] Starting agent loop with ${strategy.pollIntervalMs}ms interval`
+    `[agent] Starting agent loop with ${currentInterval}ms interval`
   );
 
   // Run first cycle immediately
   runCycle();
 
-  // Schedule subsequent cycles
-  intervalHandle = setInterval(() => {
-    runCycle();
-  }, strategy.pollIntervalMs);
+  // Schedule subsequent cycles, re-reading poll interval each time
+  const scheduleNext = () => {
+    if (!running) return;
+    intervalHandle = setTimeout(async () => {
+      await runCycle();
+      // Check if poll interval changed
+      try {
+        const latest = await getStrategy();
+        if (latest.pollIntervalMs !== currentInterval) {
+          console.log(`[agent] Poll interval changed: ${currentInterval}ms → ${latest.pollIntervalMs}ms`);
+          currentInterval = latest.pollIntervalMs;
+        }
+      } catch { /* use previous interval */ }
+      scheduleNext();
+    }, currentInterval);
+  };
+  scheduleNext();
 }
 
 export function stopAgent(): void {
@@ -236,7 +250,7 @@ export function stopAgent(): void {
   }
 
   if (intervalHandle) {
-    clearInterval(intervalHandle);
+    clearTimeout(intervalHandle);
     intervalHandle = null;
   }
 

@@ -6,15 +6,18 @@ export async function GET() {
   try {
     const status = await getAgentStatus();
 
-    const recentCycles = await prisma.agentCycle.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 10,
-    });
+    const [recentCycles, totalCycles] = await Promise.all([
+      prisma.agentCycle.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+      prisma.agentCycle.count(),
+    ]);
 
     return NextResponse.json({
       running: status.running,
       lastCycleAt: status.lastCycleAt,
-      cycleCount: status.cycleCount,
+      cycleCount: Math.max(status.cycleCount, totalCycles),
       recentCycles,
     });
   } catch (error) {
