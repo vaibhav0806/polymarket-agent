@@ -46,40 +46,42 @@ An autonomous agent that digests NBA sports data, analyzes it via LLM, and execu
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 18+
-- [Polymarket CLI](https://github.com/polymarket/cli) installed and in your PATH
-- OpenAI API key
-- Polymarket wallet private key (configured via `polymarket setup`)
-
 ### Setup
 
 ```bash
 git clone https://github.com/vaibhav0806/polymarket-agent.git
 cd polymarket-agent
 npm install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your keys: OPENAI_API_KEY, POLYMARKET_PRIVATE_KEY, etc.
-
-# Initialize database
-npx prisma generate
-npx prisma db push
-
-# Start the dev server
-npm run dev
+npm run setup
 ```
 
+The interactive setup wizard will:
+- Check prerequisites (Node.js, Polymarket CLI, wallet)
+- Prompt for API keys (OpenAI required, BallDontLie and Twitter optional)
+- Write your `.env` file
+- Initialize the database (Prisma generate + db push)
+- Check Polymarket contract approvals
+- Optionally configure OpenClaw integration
+
+Run `npm run setup -- --check` anytime to validate your configuration.
+
 Open [http://localhost:3000](http://localhost:3000) to use the dashboard.
+
+### Prerequisites
+
+- **Node.js 18+**
+- **[Polymarket CLI](https://github.com/polymarket/cli)** — `brew install polymarket/tap/polymarket-cli`
+- **Polymarket wallet** — Run `polymarket setup` to import your private key
+- **USDC.e on Polygon** — For trading collateral ([bridge here](https://portal.polygon.technology))
+- **POL on Polygon** — For gas fees (~1 POL is plenty)
+- **OpenAI API key** — For LLM analysis
 
 ### Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | Yes | OpenAI API key for LLM analysis |
-| `POLYMARKET_PRIVATE_KEY` | Yes | Ethereum private key (via `polymarket setup`) |
+| `NBA_AGENT_DIR` | Auto | Set automatically by the setup wizard |
 | `TWITTER_BEARER_TOKEN` | No | X/Twitter API bearer token for sentiment (v2 search, Basic tier+) |
 | `BALLDONTLIE_API_KEY` | No | BallDontLie API key for NBA game data |
 | `DATABASE_URL` | No | Prisma database URL (default: `file:./dev.db`) |
