@@ -102,14 +102,21 @@ function buildUserPrompt(
   if (scoreSignals.length > 0) {
     sections.push("\n=== TODAY'S GAMES ===");
     for (const s of scoreSignals) {
-      sections.push(JSON.stringify(s.data));
+      const g = s.data as Record<string, unknown>;
+      const home = g.home_team as Record<string, unknown> | undefined;
+      const away = g.visitor_team as Record<string, unknown> | undefined;
+      sections.push(
+        `${home?.full_name ?? "?"} vs ${away?.full_name ?? "?"} at ${g.status} | score: ${g.home_team_score}-${g.visitor_team_score}`
+      );
     }
   }
 
   if (standingSignals.length > 0) {
     sections.push("\n=== STANDINGS ===");
     for (const s of standingSignals) {
-      sections.push(JSON.stringify(s.data));
+      const st = s.data as Record<string, unknown>;
+      const team = st.team as Record<string, unknown> | undefined;
+      sections.push(`${team?.full_name ?? "?"}: ${st.wins}W-${st.losses}L`);
     }
   }
 

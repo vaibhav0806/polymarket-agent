@@ -17,7 +17,8 @@
     "skill:analyze": "tsx skills/nba-polymarket-trader/scripts/analyze.ts",
     "skill:cycle": "tsx skills/nba-polymarket-trader/scripts/run-cycle.ts",
     "skill:positions": "tsx skills/nba-polymarket-trader/scripts/positions.ts",
-    "skill:wallet": "tsx skills/nba-polymarket-trader/scripts/wallet.ts"
+    "skill:wallet": "tsx skills/nba-polymarket-trader/scripts/wallet.ts",
+    "skill:sync": "rsync -av --delete skills/nba-polymarket-trader/ ~/.openclaw/workspace/skills/nba-polymarket-trader/"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.4.2",

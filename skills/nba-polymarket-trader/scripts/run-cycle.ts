@@ -7,7 +7,7 @@ import { analyzeMarkets } from "@/lib/agent/analyzer";
 import { applyRiskFilters } from "@/lib/agent/risk";
 import { executeTrades } from "@/lib/agent/executor";
 import type { Signal } from "@/lib/data/types";
-import { buildStrategy, hasFlag, output, fatal } from "./_utils";
+import { buildStrategy, getFlag, hasFlag, output, fatal } from "./_utils";
 
 async function main() {
   const dryRun = hasFlag("dry-run");
@@ -15,10 +15,12 @@ async function main() {
   const startTime = Date.now();
 
   // 1. Discover markets
-  const markets = await discoverNBAMarkets(
+  const allMarkets = await discoverNBAMarkets(
     strategy.focusTeams,
     strategy.marketTypes
   );
+  const limitFlag = getFlag("limit");
+  const markets = limitFlag ? allMarkets.slice(0, parseInt(limitFlag, 10)) : allMarkets;
 
   // 2. Collect signals
   const now = new Date().toISOString();

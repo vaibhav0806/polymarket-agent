@@ -88,29 +88,43 @@ Open [http://localhost:3000](http://localhost:3000) to use the dashboard.
 
 This project is also available as an OpenClaw skill. Any OpenClaw agent can use the CLI scripts in `skills/nba-polymarket-trader/scripts/` to autonomously trade NBA markets.
 
+### OpenClaw Setup
+
+The skill requires `NBA_AGENT_DIR` to be set to the absolute path of your project clone. This tells the agent where to find the scripts and dependencies.
+
+1. Set `NBA_AGENT_DIR` in your OpenClaw agent's environment (in `~/.openclaw/openclaw.json`)
+2. Ensure `tools.profile: "full"` is set (enables the exec tool)
+3. Sync the skill to the OpenClaw workspace:
+
+```bash
+npm run skill:sync
+```
+
+This copies the skill directory to `~/.openclaw/workspace/skills/nba-polymarket-trader/`. Run this again after any script changes.
+
 ### Skill Commands
 
 ```bash
 # Check wallet and approvals
-npx tsx skills/nba-polymarket-trader/scripts/wallet.ts
+cd "$NBA_AGENT_DIR" && npx tsx skills/nba-polymarket-trader/scripts/wallet.ts
 
 # First-time setup (DB + wallet + approvals)
-npx tsx skills/nba-polymarket-trader/scripts/setup.ts
+cd "$NBA_AGENT_DIR" && npx tsx skills/nba-polymarket-trader/scripts/setup.ts
 
 # Discover NBA markets
-npx tsx skills/nba-polymarket-trader/scripts/discover.ts --teams "LAL,BOS"
+cd "$NBA_AGENT_DIR" && npx tsx skills/nba-polymarket-trader/scripts/discover.ts --teams "LAL,BOS"
 
 # Fetch NBA signals (games, injuries, tweets)
-npx tsx skills/nba-polymarket-trader/scripts/signals.ts --teams "LAL"
+cd "$NBA_AGENT_DIR" && npx tsx skills/nba-polymarket-trader/scripts/signals.ts --teams "LAL"
 
-# Analyze markets (dry run — no trades)
-npx tsx skills/nba-polymarket-trader/scripts/analyze.ts --risk conservative --min-confidence 0.7
+# Analyze markets (dry run — no trades, use --limit 20)
+cd "$NBA_AGENT_DIR" && npx tsx skills/nba-polymarket-trader/scripts/analyze.ts --risk conservative --min-confidence 0.7 --limit 20
 
-# Run full trading cycle
-npx tsx skills/nba-polymarket-trader/scripts/run-cycle.ts --teams "LAL" --max-position 5
+# Run full trading cycle (use --limit 20)
+cd "$NBA_AGENT_DIR" && npx tsx skills/nba-polymarket-trader/scripts/run-cycle.ts --teams "LAL" --max-position 5 --limit 20
 
 # Check open positions
-npx tsx skills/nba-polymarket-trader/scripts/positions.ts
+cd "$NBA_AGENT_DIR" && npx tsx skills/nba-polymarket-trader/scripts/positions.ts
 ```
 
 All scripts output structured JSON to stdout. See `skills/nba-polymarket-trader/SKILL.md` for full documentation.
